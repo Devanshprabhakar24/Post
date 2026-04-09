@@ -21,6 +21,20 @@ const Comment = require('./models/Comment');
 
 const PORT = Number(process.env.PORT) || 5000;
 
+function resolveAllowedOrigins() {
+    const isDevelopment = process.env.NODE_ENV !== 'production';
+    const configuredOrigins = String(process.env.CORS_ORIGIN || '')
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean);
+
+    if (configuredOrigins.length > 0) {
+        return configuredOrigins;
+    }
+
+    return isDevelopment ? ['http://localhost:5173'] : [];
+}
+
 /**
  * Upsert helper function
  */
@@ -56,10 +70,22 @@ async function bootstrap() {
 
         // Create HTTP server and Socket.io
         const server = http.createServer(app);
+        const allowedOrigins = resolveAllowedOrigins();
         const io = new Server(server, {
             cors: {
-                origin: '*',
-                methods: ['GET', 'POST', 'PUT', 'DELETE']
+                origin(origin, callback) {
+                    if (!origin) {
+                        return callback(null, true);
+                    }
+
+                    if (allowedOrigins.includes(origin)) {
+                        return callback(null, true);
+                    }
+
+                    return callback(new Error('Not allowed by CORS'));
+                },
+                methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+                credentials: true
             },
             transports: ['websocket', 'polling']
         });
@@ -157,6 +183,19 @@ async function bootstrap() {
         }
 
         // Start HTTP/WebSocket server
+        server.on('error', async (error) => {
+            if (error?.code === 'EADDRINUSE') {
+                console.error(`❌ Port ${PORT} is already in use. Stop the running process or set a different PORT.`);
+            } else {
+                console.error('❌ HTTP server failed to start:', error?.message || error);
+            }
+
+            cronTask.stop();
+            io.close();
+            await disconnectDatabase();
+            process.exit(1);
+        });
+
         server.listen(PORT, () => {
             console.log(`\n${'═'.repeat(60)}`);
             console.log(`🚀 Real-Time Post Explorer Backend`);

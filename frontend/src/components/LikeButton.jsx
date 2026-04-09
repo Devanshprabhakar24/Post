@@ -15,8 +15,8 @@ function LikeButton({ isLiked, likes, onToggle, disabled = false }) {
             whileTap={{ scale: 0.9 }}
             className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                 isLiked
-                    ? 'border-rose-400/70 bg-rose-500/20 text-rose-200'
-                    : 'border-slate-600 bg-slate-800/70 text-slate-200 hover:border-cyan-400/70 hover:text-cyan-200'
+                    ? 'border-rose-400/70 bg-rose-500/15 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'
+                    : 'border-slate-300 bg-white/90 text-slate-700 hover:border-cyan-500/60 hover:text-cyan-700 dark:border-slate-600 dark:bg-slate-800/70 dark:text-slate-200 dark:hover:border-cyan-400/70 dark:hover:text-cyan-200'
             } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
         >
             <motion.span
@@ -26,7 +26,7 @@ function LikeButton({ isLiked, likes, onToggle, disabled = false }) {
                 transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.22, ease: 'easeOut' }}
                 className="relative text-sm"
             >
-                <Heart className={`h-4 w-4 ${isLiked ? 'fill-current text-rose-300' : 'text-slate-300'}`} />
+                <Heart className={`h-4 w-4 ${isLiked ? 'fill-current text-rose-600 dark:text-rose-300' : 'text-slate-500 dark:text-slate-300'}`} />
                 {isLiked && (
                     <motion.span
                         initial={{ scale: 0.2, opacity: 0.5 }}

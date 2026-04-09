@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Counter = require('../models/Counter');
 
 const SALT_ROUNDS = 10;
 
@@ -59,12 +60,34 @@ async function register(req, res) {
             });
         }
 
-        const [lastUser, hashedPassword] = await Promise.all([
-            User.findOne().sort({ userId: -1 }).select({ userId: 1 }).lean(),
+        const [maxUser, hashedPassword] = await Promise.all([
+            User.findOne().sort({ userId: -1 }).select({ _id: 0, userId: 1 }).lean(),
             bcrypt.hash(String(password), SALT_ROUNDS)
         ]);
 
-        const nextUserId = Number(lastUser?.userId || 0) + 1;
+        const maxUserId = Number(maxUser?.userId || 0);
+
+        await Counter.findOneAndUpdate(
+            {
+                _id: 'userId',
+                seq: { $lt: maxUserId }
+            },
+            {
+                $set: { seq: maxUserId }
+            },
+            {
+                upsert: false,
+                new: true
+            }
+        ).lean();
+
+        const counter = await Counter.findOneAndUpdate(
+            { _id: 'userId' },
+            { $inc: { seq: 1 } },
+            { upsert: true, new: true }
+        ).lean();
+
+        const nextUserId = Number(counter?.seq);
         const baseUsername = normalizedEmail.split('@')[0] || `user${nextUserId}`;
 
         const user = await User.create({
@@ -91,7 +114,8 @@ async function register(req, res) {
         return res.status(500).json({
             success: false,
             data: null,
-            message: 'Failed to register user'
+            message: 'Failed to register user',
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 }
@@ -150,7 +174,8 @@ async function login(req, res) {
         return res.status(500).json({
             success: false,
             data: null,
-            message: 'Failed to login'
+            message: 'Failed to login',
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 }

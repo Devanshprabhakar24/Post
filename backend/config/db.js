@@ -7,7 +7,10 @@ async function connectDatabase() {
 
     mongoose.set('strictQuery', true);
     await mongoose.connect(process.env.MONGO_URI, {
-        serverSelectionTimeoutMS: 15000
+        serverSelectionTimeoutMS: 15000,
+        maxPoolSize: 20,
+        minPoolSize: 2,
+        maxIdleTimeMS: 30000
     });
 }
 

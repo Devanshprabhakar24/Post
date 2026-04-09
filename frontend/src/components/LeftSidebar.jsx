@@ -10,7 +10,9 @@ const NAV_ITEMS = [
     { to: '/profile', label: 'Profile', icon: User }
 ];
 
-export default function LeftSidebar({ onOpenNotifications, mobileOpen = false, onClose }) {
+export default function LeftSidebar({ onOpenNotifications, mobileOpen = false, onClose, theme = 'dark' }) {
+    const isDark = theme === 'dark';
+
     const navContent = (
         <>
             <div>
@@ -39,10 +41,15 @@ export default function LeftSidebar({ onOpenNotifications, mobileOpen = false, o
                                 } : onClose}
                                 className={({ isActive }) =>
                                     cn(
-                                        'group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium text-slate-300 transition',
+                                        'group flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition',
+                                        isDark ? 'text-slate-200' : 'text-slate-700',
                                         isActive
-                                            ? 'bg-cyan-500/15 text-cyan-100'
-                                            : 'hover:bg-white/5 hover:text-white'
+                                            ? (isDark
+                                                ? 'bg-cyan-400/20 text-cyan-50 shadow-[inset_0_0_0_1px_rgba(103,232,249,0.25)]'
+                                                : 'bg-cyan-500/16 text-cyan-700 shadow-[inset_0_0_0_1px_rgba(6,182,212,0.28)]')
+                                            : (isDark
+                                                ? 'hover:bg-white/10 hover:text-white'
+                                                : 'hover:bg-slate-200/70 hover:text-slate-900')
                                     )
                                 }
                             >
@@ -54,14 +61,21 @@ export default function LeftSidebar({ onOpenNotifications, mobileOpen = false, o
                 </nav>
             </div>
 
-            <p className="px-2 text-xs text-slate-500">Curate your social graph in realtime.</p>
+            <p className={cn('px-2 text-xs', isDark ? 'text-slate-400' : 'text-slate-500')}>Curate your social graph in realtime.</p>
         </>
     );
 
     return (
         <>
             <aside className="sticky top-[88px] hidden h-[calc(100vh-110px)] self-start lg:block">
-                <div className="flex h-full flex-col justify-between rounded-3xl border border-cyan-200/10 bg-slate-900/50 p-4 backdrop-blur-xl">
+                <div
+                    className={cn(
+                        'flex h-full flex-col justify-between rounded-3xl border p-4 backdrop-blur-xl',
+                        isDark
+                            ? 'border-cyan-200/15 bg-slate-900/72'
+                            : 'border-slate-200/80 bg-white/70'
+                    )}
+                >
                     {navContent}
                 </div>
             </aside>
@@ -83,7 +97,12 @@ export default function LeftSidebar({ onOpenNotifications, mobileOpen = false, o
                             initial={{ x: -24, opacity: 0 }}
                             animate={{ x: 0, opacity: 1 }}
                             exit={{ x: -22, opacity: 0 }}
-                            className="fixed left-3 top-20 z-50 h-[calc(100vh-96px)] w-[min(86vw,19rem)] rounded-3xl border border-cyan-200/10 bg-slate-950/95 p-4 backdrop-blur-xl lg:hidden"
+                            className={cn(
+                                'fixed left-3 top-20 z-50 h-[calc(100vh-96px)] w-[min(86vw,19rem)] rounded-3xl border p-4 backdrop-blur-xl lg:hidden',
+                                isDark
+                                    ? 'border-cyan-200/20 bg-slate-950/96'
+                                    : 'border-slate-200/90 bg-white/95'
+                            )}
                         >
                             <div className="flex h-full flex-col justify-between">{navContent}</div>
                         </motion.aside>

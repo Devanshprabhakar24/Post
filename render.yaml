@@ -12,11 +12,12 @@ services:
       - key: PORT
         value: 8000
       - key: MONGO_URI
-        generateValue: true
-        scope: run
+        sync: false
       - key: JWT_SECRET
         generateValue: true
         scope: run
+      - key: CORS_ORIGIN
+        sync: false
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY

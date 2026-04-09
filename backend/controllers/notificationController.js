@@ -35,7 +35,11 @@ async function getNotifications(req, res) {
             message: 'Notifications fetched successfully'
         });
     } catch (error) {
-        return res.status(500).json({ success: false, message: 'Failed to fetch notifications', error: error.message });
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch notifications',
+            error: process.env.NODE_ENV === 'development' ? error : undefined
+        });
     }
 }
 
@@ -68,7 +72,11 @@ async function markNotificationRead(req, res) {
             message: 'Notification marked as read'
         });
     } catch (error) {
-        return res.status(500).json({ success: false, message: 'Failed to mark notification as read', error: error.message });
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to mark notification as read',
+            error: process.env.NODE_ENV === 'development' ? error : undefined
+        });
     }
 }
 
@@ -91,7 +99,11 @@ async function markAllNotificationsRead(req, res) {
             message: 'All notifications marked as read'
         });
     } catch (error) {
-        return res.status(500).json({ success: false, message: 'Failed to mark all notifications as read', error: error.message });
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to mark all notifications as read',
+            error: process.env.NODE_ENV === 'development' ? error : undefined
+        });
     }
 }
 

@@ -84,7 +84,7 @@ async function getAllUsers(req, res) {
         return res.status(500).json({
             success: false,
             message: 'Failed to fetch users',
-            error: error.message
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 }
@@ -116,16 +116,10 @@ async function getUserById(req, res) {
             });
         }
 
-        const [posts, likedPosts] = await Promise.all([
-            Post.find({ userId })
-                .select({ _id: 0, postId: 1, userId: 1, title: 1, body: 1, imageUrl: 1, hashtags: 1, likes: 1, likedBy: 1, createdAt: 1, updatedAt: 1 })
-                .sort({ createdAt: -1 })
-                .lean(),
-            Post.find({ likedBy: String(userId) })
-                .select({ _id: 0, postId: 1, userId: 1, title: 1, body: 1, imageUrl: 1, hashtags: 1, likes: 1, likedBy: 1, createdAt: 1, updatedAt: 1 })
-                .sort({ createdAt: -1 })
-                .lean()
-        ]);
+        const posts = await Post.find({ userId })
+            .select({ _id: 0, postId: 1, userId: 1, title: 1, body: 1, imageUrl: 1, hashtags: 1, likes: 1, likedBy: 1, createdAt: 1, updatedAt: 1 })
+            .sort({ createdAt: -1 })
+            .lean();
 
         const followersCount = Array.isArray(user.followers) ? user.followers.length : 0;
         const followingCount = Array.isArray(user.following) ? user.following.length : 0;
@@ -136,7 +130,6 @@ async function getUserById(req, res) {
             data: {
                 user,
                 posts,
-                likedPosts,
                 followersCount,
                 followingCount,
                 isFollowing
@@ -147,7 +140,7 @@ async function getUserById(req, res) {
         return res.status(500).json({
             success: false,
             message: 'Failed to fetch user',
-            error: error.message
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 }
@@ -191,7 +184,7 @@ async function getUserPosts(req, res) {
         return res.status(500).json({
             success: false,
             message: 'Failed to fetch user posts',
-            error: error.message
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 }
@@ -227,6 +220,11 @@ async function followUser(req, res) {
             User.updateOne({ userId: targetUserId }, { $addToSet: { followers: viewerUserId } })
         ]);
 
+        const [updatedViewer, updatedTarget] = await Promise.all([
+            User.findOne({ userId: viewerUserId }).select({ _id: 0, following: 1 }).lean(),
+            User.findOne({ userId: targetUserId }).select({ _id: 0, followers: 1 }).lean()
+        ]);
+
         await createNotification({
             recipientId: targetUserId,
             senderId: viewerUserId,
@@ -240,13 +238,17 @@ async function followUser(req, res) {
             data: {
                 userId: targetUserId,
                 isFollowing: true,
-                followersCount: (Array.isArray(target.followers) ? target.followers.length : 0) + 1,
-                followingCount: Array.isArray(viewer.following) ? viewer.following.length + 1 : 1
+                followersCount: Array.isArray(updatedTarget?.followers) ? updatedTarget.followers.length : 0,
+                followingCount: Array.isArray(updatedViewer?.following) ? updatedViewer.following.length : 0
             },
             message: 'Followed successfully'
         });
     } catch (error) {
-        return res.status(500).json({ success: false, message: 'Failed to follow user', error: error.message });
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to follow user',
+            error: process.env.NODE_ENV === 'development' ? error : undefined
+        });
     }
 }
 
@@ -281,18 +283,27 @@ async function unfollowUser(req, res) {
             User.updateOne({ userId: targetUserId }, { $pull: { followers: viewerUserId } })
         ]);
 
+        const [updatedViewer, updatedTarget] = await Promise.all([
+            User.findOne({ userId: viewerUserId }).select({ _id: 0, following: 1 }).lean(),
+            User.findOne({ userId: targetUserId }).select({ _id: 0, followers: 1 }).lean()
+        ]);
+
         return res.status(200).json({
             success: true,
             data: {
                 userId: targetUserId,
                 isFollowing: false,
-                followersCount: Math.max(0, (Array.isArray(target.followers) ? target.followers.length : 0) - 1),
-                followingCount: Math.max(0, Array.isArray(viewer.following) ? viewer.following.length - 1 : 0)
+                followersCount: Array.isArray(updatedTarget?.followers) ? updatedTarget.followers.length : 0,
+                followingCount: Array.isArray(updatedViewer?.following) ? updatedViewer.following.length : 0
             },
             message: 'Unfollowed successfully'
         });
     } catch (error) {
-        return res.status(500).json({ success: false, message: 'Failed to unfollow user', error: error.message });
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to unfollow user',
+            error: process.env.NODE_ENV === 'development' ? error : undefined
+        });
     }
 }
 

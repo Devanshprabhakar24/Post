@@ -29,7 +29,11 @@ async function uploadImage(req, res) {
             message: 'Image uploaded successfully'
         });
     } catch (error) {
-        return res.status(error?.status || 500).json({ success: false, message: error?.message || 'Failed to upload image', error: error.message });
+        return res.status(error?.status || 500).json({
+            success: false,
+            message: error?.message || 'Failed to upload image',
+            error: process.env.NODE_ENV === 'development' ? error : undefined
+        });
     }
 }
 

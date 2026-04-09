@@ -15,7 +15,6 @@ export default function Profile() {
     const [profileData, setProfileData] = useState(null);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState('posts');
     const [updatingFollow, setUpdatingFollow] = useState(false);
     const [followHover, setFollowHover] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -26,7 +25,6 @@ export default function Profile() {
     const viewedUserId = Number(routeUserId || user?.userId);
     const profileUser = profileData?.user || user;
     const posts = profileData?.posts || [];
-    const likedPosts = profileData?.likedPosts || [];
     const followersCount = profileData?.followersCount || 0;
     const followingCount = profileData?.followingCount || 0;
     const isFollowing = Boolean(profileData?.isFollowing);
@@ -230,7 +228,7 @@ export default function Profile() {
 
     return (
         <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-            <div className="overflow-hidden rounded-3xl border border-cyan-200/10 bg-slate-900/50 backdrop-blur-xl">
+            <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white/80 backdrop-blur-xl dark:border-cyan-200/10 dark:bg-slate-900/50">
                 <div className="relative h-40 w-full bg-gradient-to-r from-cyan-500/40 via-blue-500/30 to-emerald-500/30">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.2),transparent_35%)]" />
                 </div>
@@ -240,18 +238,18 @@ export default function Profile() {
                         name={profileUser?.name}
                         src={displayedProfilePic}
                         online={Boolean(profileUser?.isOnline || isUserOnline(profileUser?.userId))}
-                        className="-mt-12 h-24 w-24 border-4 border-slate-950"
+                        className="-mt-12 h-24 w-24 border-4 border-white dark:border-slate-950"
                     />
 
                     <div className="mt-3 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                         <div>
-                            <h1 className="text-3xl font-semibold text-white">{profileUser?.name}</h1>
-                            <p className="text-sm text-slate-300">@{profileUser?.username || profileUser?.email}</p>
-                            <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-300">{profileUser?.bio || 'No bio yet.'}</p>
+                            <h1 className="text-3xl font-semibold text-slate-900 dark:text-white">{profileUser?.name}</h1>
+                            <p className="text-sm text-slate-600 dark:text-slate-300">@{profileUser?.username || profileUser?.email}</p>
+                            <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600 dark:text-slate-300">{profileUser?.bio || 'No bio yet.'}</p>
 
                             {isOwnProfile && (
                                 <div className="mt-4 flex flex-wrap items-center gap-2">
-                                    <label className="cursor-pointer rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-200 transition hover:border-cyan-300/30 hover:bg-cyan-500/10">
+                                    <label className="cursor-pointer rounded-xl border border-slate-300/80 bg-white/80 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-700 transition hover:border-cyan-300/40 hover:bg-cyan-500/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:border-cyan-300/30">
                                         Choose Photo
                                         <input
                                             type="file"
@@ -275,7 +273,7 @@ export default function Profile() {
                                                 type="button"
                                                 onClick={handleRemoveSelectedPhoto}
                                                 disabled={uploadingPhoto}
-                                                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-70"
+                                                className="rounded-xl border border-slate-300/80 bg-white/80 px-3 py-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/10 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
                                             >
                                                 Remove
                                             </button>
@@ -286,22 +284,22 @@ export default function Profile() {
                         </div>
 
                         <div className="flex flex-wrap items-center gap-3">
-                            <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm text-slate-200">
-                                <div className="text-xs uppercase tracking-[0.14em] text-slate-400">Followers</div>
+                            <div className="rounded-xl border border-slate-300/80 bg-slate-100/80 px-4 py-2 text-sm text-slate-700 dark:border-white/10 dark:bg-black/20 dark:text-slate-200">
+                                <div className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Followers</div>
                                 <button
                                     type="button"
                                     onClick={openFollowers}
-                                    className="text-lg font-semibold text-white transition hover:text-cyan-300"
+                                    className="text-lg font-semibold text-slate-900 transition hover:text-cyan-700 dark:text-white dark:hover:text-cyan-300"
                                 >
                                     {followersCount}
                                 </button>
                             </div>
-                            <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-2 text-sm text-slate-200">
-                                <div className="text-xs uppercase tracking-[0.14em] text-slate-400">Following</div>
+                            <div className="rounded-xl border border-slate-300/80 bg-slate-100/80 px-4 py-2 text-sm text-slate-700 dark:border-white/10 dark:bg-black/20 dark:text-slate-200">
+                                <div className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Following</div>
                                 <button
                                     type="button"
                                     onClick={openFollowing}
-                                    className="text-lg font-semibold text-white transition hover:text-cyan-300"
+                                    className="text-lg font-semibold text-slate-900 transition hover:text-cyan-700 dark:text-white dark:hover:text-cyan-300"
                                 >
                                     {followingCount}
                                 </button>
@@ -315,7 +313,7 @@ export default function Profile() {
                                     disabled={updatingFollow}
                                     className={`relative min-w-[108px] overflow-hidden rounded-xl px-4 py-2 text-sm font-semibold transition ${
                                         isFollowing
-                                            ? 'border border-white/10 bg-white/5 text-slate-200 hover:bg-rose-500'
+                                            ? 'border border-slate-300/80 bg-white/80 text-slate-700 hover:bg-rose-500 hover:text-white dark:border-white/10 dark:bg-white/5 dark:text-slate-200'
                                             : 'bg-gradient-to-r from-cyan-400 to-teal-500 text-slate-950 hover:brightness-110'
                                     } disabled:cursor-not-allowed disabled:opacity-70`}
                                 >
@@ -327,75 +325,36 @@ export default function Profile() {
                 </div>
             </div>
 
-            <div className="flex gap-2">
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('posts')}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${activeTab === 'posts' ? 'bg-cyan-500/20 text-cyan-200' : 'bg-white/5 text-slate-300'}`}
-                >
-                    Posts ({posts.length})
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('replies')}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${activeTab === 'replies' ? 'bg-cyan-500/20 text-cyan-200' : 'bg-white/5 text-slate-300'}`}
-                >
-                    Replies
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setActiveTab('likes')}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${activeTab === 'likes' ? 'bg-cyan-500/20 text-cyan-200' : 'bg-white/5 text-slate-300'}`}
-                >
-                    Likes ({likedPosts.length})
-                </button>
+            <div className="rounded-full bg-cyan-500/20 px-4 py-2 text-sm font-semibold text-cyan-700 dark:text-cyan-200 inline-flex">
+                Posts ({posts.length})
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                {activeTab === 'posts' ? (
-                    <div className="space-y-3">
-                        {posts.length === 0 ? (
-                            <p className="text-sm text-slate-400">No posts yet.</p>
-                        ) : (
-                            posts.map((post) => (
-                                <div key={post.postId} className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-200">
-                                    <p className="font-medium text-white">{post.title}</p>
-                                    <p className="mt-1 text-slate-400">{post.body}</p>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                ) : activeTab === 'replies' ? (
-                    <div className="rounded-xl border border-dashed border-white/10 bg-black/20 p-6 text-center">
-                        <p className="text-sm text-slate-400">No replies yet</p>
-                    </div>
-                ) : (
-                    <div className="space-y-3">
-                        {likedPosts.length === 0 ? (
-                            <p className="text-sm text-slate-400">No liked posts yet.</p>
-                        ) : (
-                            likedPosts.map((post) => (
-                                <div key={post.postId} className="rounded-xl border border-white/10 bg-black/20 p-3 text-sm text-slate-200">
-                                    <p className="font-medium text-white">{post.title}</p>
-                                    <p className="mt-1 text-slate-400">{post.body}</p>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                )}
+            <div className="rounded-2xl border border-slate-200/80 bg-white/75 p-5 dark:border-white/10 dark:bg-white/5">
+                <div className="space-y-3">
+                    {posts.length === 0 ? (
+                        <p className="text-sm text-slate-500 dark:text-slate-400">No posts yet.</p>
+                    ) : (
+                        posts.map((post) => (
+                            <div key={post.postId} className="rounded-xl border border-slate-200/80 bg-slate-100/85 p-3 text-sm text-slate-700 dark:border-white/10 dark:bg-black/20 dark:text-slate-200">
+                                <p className="font-medium text-slate-900 dark:text-white">{post.title}</p>
+                                <p className="mt-1 text-slate-600 dark:text-slate-400">{post.body}</p>
+                            </div>
+                        ))
+                    )}
+                </div>
             </div>
 
             {listModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-sm">
-                    <div className="w-full max-w-md rounded-3xl border border-cyan-200/10 bg-slate-950 p-5 shadow-[0_24px_80px_rgba(2,6,23,0.65)]">
+                    <div className="w-full max-w-md rounded-3xl border border-slate-200/90 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.24)] dark:border-cyan-200/10 dark:bg-slate-950 dark:shadow-[0_24px_80px_rgba(2,6,23,0.65)]">
                         <div className="flex items-center justify-between gap-3">
-                            <h3 className="text-lg font-semibold text-white">
+                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
                                 {listModal === 'followers' ? 'Followers' : 'Following'}
                             </h3>
                             <button
                                 type="button"
                                 onClick={() => setListModal(null)}
-                                className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-300 transition hover:bg-white/10"
+                                className="rounded-full border border-slate-300/80 bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-700 transition hover:bg-slate-200 dark:border-white/10 dark:bg-white/5 dark:text-slate-300 dark:hover:bg-white/10"
                             >
                                 Close
                             </button>
@@ -403,7 +362,7 @@ export default function Profile() {
 
                         <div className="mt-4 max-h-[60vh] space-y-2 overflow-y-auto pr-1">
                             {listEntries.length === 0 ? (
-                                <p className="rounded-2xl border border-white/10 bg-white/5 px-4 py-5 text-sm text-slate-400">
+                                <p className="rounded-2xl border border-slate-300/80 bg-slate-100 px-4 py-5 text-sm text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-slate-400">
                                     No {listModal} yet.
                                 </p>
                             ) : (
@@ -416,7 +375,7 @@ export default function Profile() {
                                             key={entry.userId}
                                             to={profileLink}
                                             onClick={() => setListModal(null)}
-                                            className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-3 transition hover:border-cyan-300/25 hover:bg-cyan-500/10"
+                                            className="flex items-center justify-between rounded-2xl border border-slate-300/80 bg-slate-100 px-3 py-3 transition hover:border-cyan-300/35 hover:bg-cyan-500/10 dark:border-white/10 dark:bg-white/5 dark:hover:border-cyan-300/25"
                                         >
                                             <div className="flex min-w-0 items-center gap-3">
                                                 <Avatar
@@ -426,12 +385,12 @@ export default function Profile() {
                                                     className="h-11 w-11 shrink-0"
                                                 />
                                                 <div className="min-w-0">
-                                                    <p className="truncate text-sm font-semibold text-white">{entry.name}</p>
-                                                    <p className="truncate text-xs text-slate-400">@{entry.username || entry.email}</p>
+                                                    <p className="truncate text-sm font-semibold text-slate-900 dark:text-white">{entry.name}</p>
+                                                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">@{entry.username || entry.email}</p>
                                                 </div>
                                             </div>
 
-                                            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-cyan-200">
+                                            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-cyan-700 dark:text-cyan-200">
                                                 View
                                             </span>
                                         </Link>

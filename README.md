@@ -179,13 +179,19 @@ socket.on("results", (data) => {
 PORT=8000
 MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/database
 NODE_ENV=development
+CORS_ORIGIN=http://localhost:3000,http://localhost:5173
 ```
 
 ### Frontend (.env)
 
 ```env
-VITE_API_URL=http://localhost:8000
-VITE_WS_URL=http://localhost:8000
+# Development (recommended): keep empty and use Vite proxy
+VITE_API_URL=
+VITE_WS_URL=
+
+# Production (required in Vercel environment variables)
+# VITE_API_URL=https://your-backend.onrender.com
+# VITE_WS_URL=wss://your-backend.onrender.com
 ```
 
 ## 🚀 Deployment

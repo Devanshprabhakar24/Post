@@ -1,6 +1,6 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { Search } from 'lucide-react';
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchPosts } from '../services/api';
 import { Input } from './ui/input';
@@ -18,6 +18,7 @@ function SearchBar({ value, onChange, onClear, searching, inputRef, compact = fa
     const [placeholderIndex, setPlaceholderIndex] = useState(0);
     const [results, setResults] = useState([]);
     const [activeIndex, setActiveIndex] = useState(-1);
+    const suggestionCacheRef = useRef(new Map());
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -29,21 +30,34 @@ function SearchBar({ value, onChange, onClear, searching, inputRef, compact = fa
 
     useEffect(() => {
         const trimmed = String(value || '').trim();
+        const normalized = trimmed.toLowerCase();
 
-        if (!trimmed) {
+        if (!trimmed || trimmed.length < 2) {
             setResults([]);
             setActiveIndex(-1);
             return;
         }
 
+        const cached = suggestionCacheRef.current.get(normalized);
+        if (cached) {
+            setResults(cached);
+            return;
+        }
+
         let active = true;
+        const controller = new AbortController();
         const timer = setTimeout(async () => {
             try {
-                const response = await fetchPosts({ page: 1, limit: 6, keyword: trimmed });
+                const response = await fetchPosts(
+                    { page: 1, limit: 6, keyword: trimmed },
+                    { signal: controller.signal }
+                );
                 if (!active) {
                     return;
                 }
-                setResults(Array.isArray(response?.posts) ? response.posts : []);
+                const nextResults = Array.isArray(response?.posts) ? response.posts : [];
+                suggestionCacheRef.current.set(normalized, nextResults);
+                setResults(nextResults);
             } catch (_error) {
                 if (active) {
                     setResults([]);
@@ -54,6 +68,7 @@ function SearchBar({ value, onChange, onClear, searching, inputRef, compact = fa
         return () => {
             active = false;
             clearTimeout(timer);
+            controller.abort();
         };
     }, [value]);
 
@@ -92,11 +107,11 @@ function SearchBar({ value, onChange, onClear, searching, inputRef, compact = fa
                         : '0 8px 24px rgba(2, 6, 23, 0.25)'
                 }}
                 transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
-                className={`rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl ${compact ? 'p-2.5' : 'p-3.5'}`}
+                className={`rounded-2xl border border-slate-200/80 bg-white/72 backdrop-blur-xl dark:border-white/15 dark:bg-slate-900/78 ${compact ? 'p-2.5' : 'p-3.5'}`}
             >
                 <label htmlFor={inputId} className="sr-only">Search posts</label>
-                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-slate-900/65 px-3.5 py-2.5">
-                    <Search className="h-4.5 w-4.5 text-slate-400" />
+                <div className="flex items-center gap-3 rounded-xl border border-slate-200/90 bg-white/88 px-3.5 py-2.5 dark:border-white/15 dark:bg-slate-950/78">
+                    <Search className="h-4.5 w-4.5 text-slate-500 dark:text-slate-300" />
                     <Input
                         id={inputId}
                         ref={inputRef}
@@ -137,7 +152,7 @@ function SearchBar({ value, onChange, onClear, searching, inputRef, compact = fa
                             type="button"
                             onClick={onClear}
                             aria-label="Clear search"
-                            className="text-xs font-medium text-slate-400 transition hover:text-white"
+                            className="text-xs font-medium text-slate-600 transition hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
                         >
                             Clear
                         </button>
@@ -163,10 +178,10 @@ function SearchBar({ value, onChange, onClear, searching, inputRef, compact = fa
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 6 }}
                         transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-                        className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 rounded-2xl border border-cyan-200/10 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-xl"
+                        className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 rounded-2xl border border-slate-200/90 bg-white/95 p-2 shadow-2xl backdrop-blur-xl dark:border-cyan-200/20 dark:bg-slate-950/96"
                     >
                         {highlightedResults.length === 0 ? (
-                            <p className="px-3 py-2 text-sm text-slate-400">No matches found</p>
+                            <p className="px-3 py-2 text-sm text-slate-600 dark:text-slate-300">No matches found</p>
                         ) : (
                             highlightedResults.map((item, index) => (
                                 <button
@@ -175,7 +190,7 @@ function SearchBar({ value, onChange, onClear, searching, inputRef, compact = fa
                                     onMouseEnter={() => setActiveIndex(index)}
                                     onClick={() => commitSelection(item)}
                                     className={`block w-full rounded-xl px-3 py-2 text-left text-sm transition ${
-                                        index === activeIndex ? 'bg-cyan-500/20 text-cyan-50' : 'text-slate-200 hover:bg-white/5'
+                                        index === activeIndex ? 'bg-cyan-500/24 text-cyan-900 dark:text-cyan-50' : 'text-slate-800 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-white/10'
                                     }`}
                                 >
                                     <p className="line-clamp-1 font-medium">
@@ -189,7 +204,7 @@ function SearchBar({ value, onChange, onClear, searching, inputRef, compact = fa
                                             )
                                         ))}
                                     </p>
-                                    <p className="line-clamp-1 text-xs text-slate-400">@{item?.author?.username || item?.author?.name || `user-${item.userId}`}</p>
+                                    <p className="line-clamp-1 text-xs text-slate-500 dark:text-slate-300">@{item?.author?.username || item?.author?.name || `user-${item.userId}`}</p>
                                 </button>
                             ))
                         )}

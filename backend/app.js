@@ -33,12 +33,37 @@ function getDatabaseStatus() {
 
 function createApp() {
     const app = express();
+    const isDevelopment = process.env.NODE_ENV !== 'production';
+    const configuredOrigins = String(process.env.CORS_ORIGIN || '')
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean);
+    const allowedOrigins = configuredOrigins.length > 0
+        ? configuredOrigins
+        : (isDevelopment ? ['http://localhost:5173'] : []);
+
+    const corsOptions = {
+        origin(origin, callback) {
+            if (!origin) {
+                return callback(null, true);
+            }
+
+            if (allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            }
+
+            return callback(new Error('Not allowed by CORS'));
+        },
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+    };
 
     // Return full JSON payloads for API requests instead of 304 revalidation responses.
     app.set('etag', false);
 
     // Middleware
-    app.use(cors());
+    app.use(cors(corsOptions));
+    app.options(/.*/, cors(corsOptions));
     app.use(compression());
     app.use(express.json());
     app.use(express.urlencoded({ extended: true }));

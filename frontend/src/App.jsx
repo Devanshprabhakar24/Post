@@ -105,6 +105,7 @@ function AppShell({ pageProps, theme, setTheme, query, setQuery, searching, sear
                     onOpenNotifications={() => setNotificationOpen(true)}
                     mobileOpen={mobileSidebarOpen}
                     onClose={() => setMobileSidebarOpen(false)}
+                    theme={theme}
                 />
 
                 <section className="min-h-[calc(100vh-88px)] min-w-0">
@@ -282,7 +283,7 @@ export default function App() {
 
     return (
         <ErrorBoundary>
-            <div className="min-h-screen bg-slate-100 text-slate-900 dark:bg-surface-950 dark:text-slate-100">
+            <div className="min-h-screen bg-transparent text-slate-900 dark:text-slate-100">
             <a
                 href="#main-content"
                 className="sr-only z-[100] rounded-md bg-blue-600 px-4 py-2 text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
@@ -291,10 +292,10 @@ export default function App() {
             </a>
 
             <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-                <div className="ambient-grid absolute inset-0 opacity-70" />
-                <div className="absolute -left-24 top-20 h-72 w-72 rounded-full bg-cyan-500/20 blur-3xl" />
-                <div className="absolute right-0 top-1/3 h-96 w-96 rounded-full bg-emerald-500/20 blur-3xl" />
-                <div className="absolute left-1/3 top-2/3 h-80 w-80 rounded-full bg-sky-500/10 blur-3xl" />
+                <div className="ambient-grid absolute inset-0 opacity-45 dark:opacity-70" />
+                <div className="absolute -left-24 top-20 h-72 w-72 rounded-full bg-cyan-500/14 blur-3xl dark:bg-cyan-500/20" />
+                <div className="absolute right-0 top-1/3 h-96 w-96 rounded-full bg-emerald-500/12 blur-3xl dark:bg-emerald-500/20" />
+                <div className="absolute left-1/3 top-2/3 h-80 w-80 rounded-full bg-sky-500/8 blur-3xl dark:bg-sky-500/10" />
             </div>
 
             {isAuthRoute ? (

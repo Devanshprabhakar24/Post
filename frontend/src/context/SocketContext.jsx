@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from './AuthContext';
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '../services/api';
-import { connectSocket, disconnectSocket, identifyUser, onNewPost, onNotification, onUserOffline, onUserOnline, socket } from '../services/socket';
+import { connectSocket, disconnectSocket, identifyUser, onLikeUpdated, onNewPost, onNotification, onUserOffline, onUserOnline, socket } from '../services/socket';
 
 const SocketContext = createContext(null);
 
@@ -88,6 +88,8 @@ export function SocketProvider({ children }) {
             identifyUser(user.userId);
         }
 
+        const unsubscribes = [];
+
         const stopNotification = onNotification((payload) => {
             const kind = String(payload?.type || 'system').toLowerCase();
             const targetUrl = payload?.targetUrl || buildLikeNotificationTarget(payload);
@@ -111,6 +113,7 @@ export function SocketProvider({ children }) {
                 ...(current.some((entry) => entry.id === nextItem.id) ? current : [nextItem, ...current])
             ].slice(0, 30));
         });
+        unsubscribes.push(stopNotification);
 
         const stopPostCreated = onNewPost((payload) => {
             setNotifications((current) => [
@@ -125,20 +128,42 @@ export function SocketProvider({ children }) {
                 ...current
             ].slice(0, 30));
         });
+        unsubscribes.push(stopPostCreated);
+
+        const stopLikeUpdated = onLikeUpdated((payload) => {
+            const message = buildLikeNotificationMessage(payload);
+
+            setNotifications((current) => [
+                normalizeNotification({
+                    id: `${Date.now()}-like-${payload?.postId || 'post'}`,
+                    type: 'like',
+                    message,
+                    targetUrl: buildLikeNotificationTarget(payload),
+                    isRead: false,
+                    createdAt: new Date().toISOString(),
+                    payload
+                }),
+                ...current
+            ].slice(0, 30));
+        });
+        unsubscribes.push(stopLikeUpdated);
 
         const stopUserOnline = onUserOnline((payload) => {
             setOnlineUsers((current) => Array.from(new Set([...(current || []), ...(payload?.onlineUsers || []), Number(payload?.userId || 0)])).filter(Boolean));
         });
+        unsubscribes.push(stopUserOnline);
 
         const stopUserOffline = onUserOffline((payload) => {
             setOnlineUsers((current) => current.filter((entry) => entry !== Number(payload?.userId)));
         });
+        unsubscribes.push(stopUserOffline);
 
         return () => {
-            stopNotification();
-            stopPostCreated();
-            stopUserOnline();
-            stopUserOffline();
+            unsubscribes.forEach((unsubscribe) => {
+                if (typeof unsubscribe === 'function') {
+                    unsubscribe();
+                }
+            });
             disconnectSocket();
         };
     }, [user?.userId]);

@@ -43,7 +43,7 @@ export default function Navbar({
     );
 
     return (
-        <header className="sticky top-0 z-40 border-b border-cyan-200/10 bg-slate-950/70 backdrop-blur-2xl dark:bg-slate-950/70">
+        <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/72 backdrop-blur-2xl dark:border-cyan-200/10 dark:bg-slate-950/70">
             <div className="mx-auto flex h-[74px] w-full max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8" role="navigation" aria-label="Primary navigation">
                 <Button variant="ghost" size="icon" onClick={onToggleSidebar} className="lg:hidden" aria-label="Open filters panel">
                     <PanelLeft className="h-5 w-5" />
@@ -58,8 +58,8 @@ export default function Navbar({
                         <span className="absolute inset-1 rounded-xl border border-white/25" />
                     </motion.div>
                     <div className="leading-tight">
-                        <p className="text-[10px] uppercase tracking-[0.24em] text-cyan-200/80">Realtime Social Graph</p>
-                        <h1 className="text-[1.03rem] font-semibold text-white">Post Explorer</h1>
+                        <p className="text-[10px] uppercase tracking-[0.24em] text-cyan-700/90 dark:text-cyan-200/80">Realtime Social Graph</p>
+                        <h1 className="text-[1.03rem] font-semibold text-slate-900 dark:text-white">Post Explorer</h1>
                     </div>
                 </Link>
 
@@ -75,11 +75,11 @@ export default function Navbar({
                     />
                 </div>
 
-                <div className="ml-auto flex items-center gap-2 text-sm text-slate-300">
+                <div className="ml-auto flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
                     {isAuthenticated && (
-                        <div className="hidden items-center gap-2 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 lg:inline-flex">
+                        <div className="hidden items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/12 px-2.5 py-1 lg:inline-flex dark:border-emerald-400/25 dark:bg-emerald-500/10">
                             <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-200">
+                            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-200">
                                 {onlineSet.size} online
                             </span>
                             <div className="ml-1 flex items-center">
@@ -93,18 +93,18 @@ export default function Navbar({
                                             <Avatar
                                                 name={profile.name || profile.username}
                                                 online
-                                                className="h-7 w-7 border-slate-950"
+                                                className="h-7 w-7 border-white dark:border-slate-950"
                                             />
                                         </div>
                                     ))
                                 ) : (
-                                    <span className="text-xs text-emerald-200/70">No active users</span>
+                                    <span className="text-xs text-emerald-700/80 dark:text-emerald-200/70">No active users</span>
                                 )}
                             </div>
                         </div>
                     )}
 
-                    <div className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-slate-300 lg:inline-flex">
+                    <div className="hidden items-center gap-1 rounded-full border border-slate-300/70 bg-white/70 px-2 py-1 text-xs text-slate-600 lg:inline-flex dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
                         <Command className="h-3.5 w-3.5" /> /
                     </div>
 
@@ -170,8 +170,8 @@ export default function Navbar({
                     inputRef={searchInputRef}
                     inputId="global-post-search-mobile"
                 />
-                <div className="mt-1 inline-flex items-center gap-1 text-xs text-slate-400">
-                    <Search className="h-3.5 w-3.5" /> Press <span className="rounded bg-white/10 px-1">/</span> to focus search
+                <div className="mt-1 inline-flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
+                    <Search className="h-3.5 w-3.5" /> Press <span className="rounded bg-slate-300/55 px-1 dark:bg-white/10">/</span> to focus search
                 </div>
             </div>
         </header>

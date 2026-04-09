@@ -5,14 +5,14 @@
 @tailwind utilities;
 
 :root {
-    --bg-deep: #050914;
-    --bg-mid: #0b1325;
-    --bg-glow-a: rgba(14, 165, 233, 0.18);
-    --bg-glow-b: rgba(16, 185, 129, 0.14);
-    --text-main: #f8fafc;
-    --text-muted: #cbd5e1;
-    --surface-glass: rgba(8, 18, 36, 0.64);
-    --surface-edge: rgba(125, 211, 252, 0.2);
+    --bg-deep: #f1f5f9;
+    --bg-mid: #ffffff;
+    --bg-glow-a: rgba(14, 165, 233, 0.12);
+    --bg-glow-b: rgba(16, 185, 129, 0.1);
+    --text-main: #0f172a;
+    --text-muted: #475569;
+    --surface-glass: rgba(255, 255, 255, 0.82);
+    --surface-edge: rgba(14, 165, 233, 0.24);
     --radius-lg: 1rem;
     --radius-xl: 1.25rem;
     --space-2: 0.5rem;
@@ -26,6 +26,17 @@
     --ease-emphasis: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+html.dark {
+    --bg-deep: #050914;
+    --bg-mid: #0b1325;
+    --bg-glow-a: rgba(14, 165, 233, 0.18);
+    --bg-glow-b: rgba(16, 185, 129, 0.14);
+    --text-main: #f8fafc;
+    --text-muted: #cbd5e1;
+    --surface-glass: rgba(8, 18, 36, 0.64);
+    --surface-edge: rgba(125, 211, 252, 0.2);
+}
+
 html {
     scroll-behavior: smooth;
 }
@@ -35,13 +46,20 @@ body {
     background:
         radial-gradient(circle at 12% 18%, var(--bg-glow-a) 0%, transparent 34%),
         radial-gradient(circle at 82% 22%, var(--bg-glow-b) 0%, transparent 38%),
-        linear-gradient(160deg, var(--bg-mid) 0%, var(--bg-deep) 62%, #04070f 100%);
+        linear-gradient(160deg, var(--bg-mid) 0%, var(--bg-deep) 62%, #e2e8f0 100%);
     color: var(--text-main);
     letter-spacing: 0.01em;
     line-height: 1.5;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+html.dark body {
+    background:
+        radial-gradient(circle at 12% 18%, var(--bg-glow-a) 0%, transparent 34%),
+        radial-gradient(circle at 82% 22%, var(--bg-glow-b) 0%, transparent 38%),
+        linear-gradient(160deg, var(--bg-mid) 0%, var(--bg-deep) 62%, #04070f 100%);
 }
 
 h1,
@@ -87,6 +105,10 @@ button {
     @apply rounded-2xl border shadow-xl backdrop-blur-md;
     border-color: var(--surface-edge);
     background: var(--surface-glass);
+    box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+}
+
+html.dark .glass-card {
     box-shadow: 0 24px 50px rgba(2, 6, 23, 0.45);
 }
 

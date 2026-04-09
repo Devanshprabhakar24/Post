@@ -1,6 +1,13 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.DEV ? '' : (import.meta.env.VITE_API_URL || 'http://localhost:8000');
+const isDev = import.meta.env.DEV;
+const configuredProdApiUrl = String(import.meta.env.VITE_API_URL || '').trim();
+
+if (!isDev && !configuredProdApiUrl) {
+    throw new Error('VITE_API_URL is required in production');
+}
+
+const API_BASE_URL = isDev ? '' : configuredProdApiUrl;
 const AUTH_TOKEN_KEY = 'post-explorer-access-token';
 
 const api = axios.create({
@@ -258,8 +265,8 @@ async function getLikeStatus(postId, userId) {
 
 async function fetchPostCommentsCount(postId) {
     try {
-        const { data } = await api.get(`/api/posts/${postId}/comments`);
-        return Number(data?.count) || 0;
+        const { data: result } = await api.get(`/api/posts/${postId}/comments`);
+        return Number(result?.count) || 0;
     } catch (error) {
         throw new Error(getErrorMessage(error, 'Failed to fetch comments count'));
     }

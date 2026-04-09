@@ -23,11 +23,16 @@ const postSchema = new mongoose.Schema(
             type: String,
             required: true,
             trim: true,
+            minlength: 3,
+            maxlength: 300,
             index: true
         },
         body: {
             type: String,
             required: true,
+            trim: true,
+            minlength: 10,
+            maxlength: 5000,
             index: true
         },
         imageUrl: {
@@ -54,7 +59,7 @@ const postSchema = new mongoose.Schema(
             index: true
         },
         likedBy: {
-            type: [String],
+            type: [Number],
             default: []
         },
         isExternal: {

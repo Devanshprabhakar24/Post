@@ -103,12 +103,16 @@ function getAuthUserId(req) {
     return fallback ? Number(fallback) : null;
 }
 
-function canModifyPost(post, authUserId) {
+function canModifyPost(post, authUserId, isAdmin = false) {
+    if (isAdmin) {
+        return true;
+    }
+
     if (!post || !authUserId) {
         return false;
     }
 
-    return post.isExternal === false || Number(post.userId) === Number(authUserId);
+    return Number(post.userId) === Number(authUserId);
 }
 
 /**
@@ -230,7 +234,7 @@ async function fetchAndStorePosts(req, res) {
         return res.status(500).json({
             success: false,
             message: 'Failed to fetch and store posts',
-            error: error.message
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 }
@@ -325,12 +329,14 @@ async function createPost(req, res) {
     try {
         const authUserId = getAuthUserId(req);
         const { title, body, imageUrl, image } = req.body || {};
+        const normalizedTitle = String(title || '').trim();
+        const normalizedBody = String(body || '').trim();
 
         if (!authUserId || Number.isNaN(authUserId)) {
             return res.status(401).json({ success: false, data: null, message: 'Unauthorized' });
         }
 
-        if (!title || !body) {
+        if (!normalizedTitle || !normalizedBody) {
             return res.status(400).json({
                 success: false,
                 data: null,
@@ -338,9 +344,25 @@ async function createPost(req, res) {
             });
         }
 
+        if (normalizedTitle.length < 3 || normalizedTitle.length > 300) {
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: 'title must be between 3 and 300 characters'
+            });
+        }
+
+        if (normalizedBody.length < 10 || normalizedBody.length > 5000) {
+            return res.status(400).json({
+                success: false,
+                data: null,
+                message: 'body must be between 10 and 5000 characters'
+            });
+        }
+
         const maxPost = await Post.findOne().sort({ postId: -1 }).select({ postId: 1 }).lean();
         const nextPostId = Number(maxPost?.postId || 0) + 1;
-        const hashtags = extractHashtags([title, body]);
+        const hashtags = extractHashtags([normalizedTitle, normalizedBody]);
         let resolvedImageUrl = String(imageUrl || image || '').trim();
         let resolvedImageData = '';
         let resolvedImageContentType = '';
@@ -367,8 +389,8 @@ async function createPost(req, res) {
             id: nextPostId,
             postId: nextPostId,
             userId: authUserId,
-            title: String(title).trim(),
-            body: String(body).trim(),
+            title: normalizedTitle,
+            body: normalizedBody,
             imageUrl: resolvedImageUrl,
             imageData: resolvedImageData,
             imageContentType: resolvedImageContentType,
@@ -400,7 +422,7 @@ async function createPost(req, res) {
             success: false,
             data: null,
             message: 'Failed to create post',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 }
@@ -428,7 +450,7 @@ async function updatePost(req, res) {
             return res.status(404).json({ success: false, data: null, message: 'Post not found' });
         }
 
-        if (!canModifyPost(post, authUserId)) {
+        if (!canModifyPost(post, authUserId, Boolean(req.user?.isAdmin))) {
             return res.status(403).json({
                 success: false,
                 data: null,
@@ -461,7 +483,7 @@ async function updatePost(req, res) {
             success: false,
             data: null,
             message: 'Failed to update post',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 }
@@ -488,7 +510,7 @@ async function deletePost(req, res) {
             return res.status(404).json({ success: false, data: null, message: 'Post not found' });
         }
 
-        if (!canModifyPost(post, authUserId)) {
+        if (!canModifyPost(post, authUserId, Boolean(req.user?.isAdmin))) {
             return res.status(403).json({
                 success: false,
                 data: null,
@@ -511,7 +533,7 @@ async function deletePost(req, res) {
             success: false,
             data: null,
             message: 'Failed to delete post',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 }
@@ -569,23 +591,55 @@ async function getAllPosts(req, res) {
                             {
                                 $lookup: {
                                     from: 'users',
-                                    localField: 'userId',
-                                    foreignField: 'userId',
+                                    let: { authorUserId: '$userId' },
+                                    pipeline: [
+                                        {
+                                            $match: {
+                                                $expr: {
+                                                    $eq: ['$userId', '$$authorUserId']
+                                                }
+                                            }
+                                        },
+                                        {
+                                            $project: {
+                                                _id: 0,
+                                                userId: 1,
+                                                name: 1,
+                                                username: 1,
+                                                email: 1,
+                                                imageUrl: 1,
+                                                bio: 1,
+                                                isOnline: 1
+                                            }
+                                        },
+                                        { $limit: 1 }
+                                    ],
                                     as: 'author'
                                 }
                             },
                             {
                                 $lookup: {
                                     from: 'comments',
-                                    localField: 'postId',
-                                    foreignField: 'postId',
-                                    as: 'comments'
+                                    let: { postId: '$postId' },
+                                    pipeline: [
+                                        {
+                                            $match: {
+                                                $expr: {
+                                                    $eq: ['$postId', '$$postId']
+                                                }
+                                            }
+                                        },
+                                        { $count: 'count' }
+                                    ],
+                                    as: 'commentsMeta'
                                 }
                             },
                             {
                                 $addFields: {
                                     author: { $arrayElemAt: ['$author', 0] },
-                                    commentsCount: { $size: '$comments' },
+                                    commentsCount: {
+                                        $ifNull: [{ $arrayElemAt: ['$commentsMeta.count', 0] }, 0]
+                                    },
                                     likes: { $ifNull: ['$likes', 0] },
                                     likedBy: { $ifNull: ['$likedBy', []] },
                                     hashtags: { $ifNull: ['$hashtags', []] },
@@ -647,7 +701,7 @@ async function getAllPosts(req, res) {
         return res.status(500).json({
             success: false,
             message: 'Failed to fetch posts',
-            error: error.message
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 }
@@ -756,7 +810,7 @@ async function getPostById(req, res) {
         return res.status(500).json({
             success: false,
             message: 'Failed to fetch post',
-            error: error.message
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 }
@@ -802,7 +856,7 @@ async function getPostComments(req, res) {
         return res.status(500).json({
             success: false,
             message: 'Failed to fetch comments',
-            error: error.message
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 }
@@ -834,7 +888,7 @@ async function search(req, res) {
         return res.status(500).json({
             success: false,
             message: 'Search failed',
-            error: error.message
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 }
@@ -852,20 +906,19 @@ async function likePost(req, res) {
     try {
         const postId = parseInt(req.params.id);
         const authUserId = getAuthUserId(req);
-        const userId = String(authUserId || '').trim();
 
         if (Number.isNaN(postId) || postId < 1) {
             return res.status(400).json({ success: false, data: null, message: 'Invalid post ID' });
         }
 
-        if (!userId) {
+        if (!authUserId || Number.isNaN(authUserId)) {
             return res.status(400).json({ success: false, data: null, message: 'userId is required' });
         }
 
         const updated = await Post.findOneAndUpdate(
-            { postId, likedBy: { $ne: userId } },
+            { postId, likedBy: { $ne: authUserId } },
             {
-                $addToSet: { likedBy: userId },
+                $addToSet: { likedBy: authUserId },
                 $inc: { likes: 1 }
             },
             { new: true }
@@ -921,20 +974,19 @@ async function unlikePost(req, res) {
     try {
         const postId = parseInt(req.params.id);
         const authUserId = getAuthUserId(req);
-        const userId = String(authUserId || '').trim();
 
         if (Number.isNaN(postId) || postId < 1) {
             return res.status(400).json({ success: false, data: null, message: 'Invalid post ID' });
         }
 
-        if (!userId) {
+        if (!authUserId || Number.isNaN(authUserId)) {
             return res.status(400).json({ success: false, data: null, message: 'userId is required' });
         }
 
         const updated = await Post.findOneAndUpdate(
-            { postId, likedBy: userId },
+            { postId, likedBy: authUserId },
             {
-                $pull: { likedBy: userId },
+                $pull: { likedBy: authUserId },
                 $inc: { likes: -1 }
             },
             { new: true }
@@ -984,7 +1036,7 @@ async function unlikePost(req, res) {
 async function getLikeStatus(req, res) {
     try {
         const postId = parseInt(req.params.id);
-        const userId = String(req.query.userId || '').trim();
+        const authUserId = Number(req.query.userId);
 
         if (Number.isNaN(postId) || postId < 1) {
             return res.status(400).json({ success: false, data: null, message: 'Invalid post ID' });
@@ -1003,7 +1055,7 @@ async function getLikeStatus(req, res) {
             data: {
                 postId,
                 totalLikes,
-                isLiked: userId ? likedBy.includes(userId) : false
+                isLiked: Number.isFinite(authUserId) ? likedBy.includes(authUserId) : false
             },
             message: 'Like status fetched successfully'
         });
@@ -1041,18 +1093,32 @@ async function getTrendingPosts(_req, res) {
                 {
                     $lookup: {
                         from: 'comments',
-                        localField: 'postId',
-                        foreignField: 'postId',
-                        as: 'comments'
+                        let: { postId: '$postId' },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $eq: ['$postId', '$$postId']
+                                    }
+                                }
+                            },
+                            { $count: 'count' }
+                        ],
+                        as: 'commentsMeta'
                     }
                 },
                 {
                     $addFields: {
-                        commentsCount: { $size: '$comments' },
+                        commentsCount: {
+                            $ifNull: [{ $arrayElemAt: ['$commentsMeta.count', 0] }, 0]
+                        },
                         likesSafe: { $ifNull: ['$likes', 0] },
                         hashtags: { $ifNull: ['$hashtags', []] },
                         trendingScore: {
-                            $add: [{ $ifNull: ['$likes', 0] }, { $multiply: [{ $size: '$comments' }, 1] }]
+                            $add: [
+                                { $ifNull: ['$likes', 0] },
+                                { $ifNull: [{ $arrayElemAt: ['$commentsMeta.count', 0] }, 0] }
+                            ]
                         }
                     }
                 },

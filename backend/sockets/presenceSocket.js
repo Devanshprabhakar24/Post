@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const mongoose = require('mongoose');
 
 let ioInstance = null;
 const onlineUsers = new Map();
@@ -8,15 +9,32 @@ function getOnlineUserIds() {
 }
 
 async function setPresence(userId, isOnline) {
-    await User.updateOne(
-        { userId },
-        {
-            $set: {
-                isOnline,
-                onlineAt: isOnline ? new Date() : null
+    if (mongoose.connection.readyState !== 1) {
+        return;
+    }
+
+    try {
+        await User.updateOne(
+            { userId },
+            {
+                $set: {
+                    isOnline,
+                    onlineAt: isOnline ? new Date() : null
+                }
             }
+        );
+    } catch (error) {
+        const message = String(error?.message || '').toLowerCase();
+        const isDisconnectError =
+            error?.name === 'MongoNotConnectedError' ||
+            message.includes('client must be connected') ||
+            message.includes('topology is closed') ||
+            message.includes('connection') && message.includes('closed');
+
+        if (!isDisconnectError) {
+            throw error;
         }
-    );
+    }
 }
 
 async function markOnline(userId) {
@@ -64,13 +82,21 @@ function attachPresenceSocket(io) {
             socket.data.userId = userId;
             socket.join(String(userId));
             socket.join(`user:${userId}`);
-            await markOnline(userId);
+            try {
+                await markOnline(userId);
+            } catch (_error) {
+                // Presence writes are best-effort; failures should not crash socket flow.
+            }
         });
 
         socket.on('disconnect', async () => {
             const userId = Number(socket.data.userId);
             if (Number.isFinite(userId) && userId > 0) {
-                await markOffline(userId);
+                try {
+                    await markOffline(userId);
+                } catch (_error) {
+                    // Ignore disconnect-time persistence failures during shutdown.
+                }
             }
         });
     });

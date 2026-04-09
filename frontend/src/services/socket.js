@@ -1,6 +1,11 @@
 import { io } from 'socket.io-client';
 
 const FALLBACK_URL = 'http://localhost:8000';
+const isDev = import.meta.env.DEV;
+
+if (!isDev && !String(import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL || '').trim()) {
+    throw new Error('VITE_WS_URL or VITE_API_URL is required in production');
+}
 
 function normalizeUrl(raw) {
     if (!raw) {
@@ -10,7 +15,11 @@ function normalizeUrl(raw) {
     return raw.replace(/^ws:\/\//i, 'http://').replace(/^wss:\/\//i, 'https://').replace(/\/$/, '');
 }
 
-const SOCKET_URL = normalizeUrl(import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL || FALLBACK_URL);
+const SOCKET_URL = normalizeUrl(
+    isDev
+        ? (import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL || FALLBACK_URL)
+        : (import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL)
+);
 
 const SOCKET_OPTIONS = import.meta.env.DEV
     ? {

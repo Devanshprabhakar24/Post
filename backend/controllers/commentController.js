@@ -127,7 +127,7 @@ async function getAllComments(req, res) {
         return res.status(500).json({
             success: false,
             message: 'Failed to fetch comments',
-            error: error.message
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 }
@@ -167,7 +167,7 @@ async function getCommentById(req, res) {
         return res.status(500).json({
             success: false,
             message: 'Failed to fetch comment',
-            error: error.message
+            error: process.env.NODE_ENV === 'development' ? error : undefined
         });
     }
 }
@@ -230,7 +230,11 @@ async function createPostComment(req, res) {
             message: 'Comment created successfully'
         });
     } catch (error) {
-        return res.status(500).json({ success: false, message: 'Failed to create comment', error: error.message });
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to create comment',
+            error: process.env.NODE_ENV === 'development' ? error : undefined
+        });
     }
 }
 
@@ -298,7 +302,11 @@ async function createReply(req, res) {
             message: 'Reply created successfully'
         });
     } catch (error) {
-        return res.status(500).json({ success: false, message: 'Failed to create reply', error: error.message });
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to create reply',
+            error: process.env.NODE_ENV === 'development' ? error : undefined
+        });
     }
 }
 
@@ -324,7 +332,11 @@ async function getPostComments(req, res) {
             message: 'Comments fetched successfully'
         });
     } catch (error) {
-        return res.status(500).json({ success: false, message: 'Failed to fetch comments', error: error.message });
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch comments',
+            error: process.env.NODE_ENV === 'development' ? error : undefined
+        });
     }
 }
 

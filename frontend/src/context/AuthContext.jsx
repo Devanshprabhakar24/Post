@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { AUTH_TOKEN_KEY, loginUser, registerUser } from '../services/api';
 
 const AUTH_USER_KEY = 'post-explorer-auth-user';
@@ -70,23 +70,23 @@ export function AuthProvider({ children }) {
         }
     };
 
-    const login = async (payload) => {
+    const login = useCallback(async (payload) => {
         const data = await loginUser(payload);
         setSession(data?.token || '', data?.user || null);
         return data;
-    };
+    }, []);
 
-    const register = async (payload) => {
+    const register = useCallback(async (payload) => {
         const data = await registerUser(payload);
         setSession(data?.token || '', data?.user || null);
         return data;
-    };
+    }, []);
 
-    const logout = () => {
+    const logout = useCallback(() => {
         setSession('', null);
-    };
+    }, []);
 
-    const updateUser = (partialUser) => {
+    const updateUser = useCallback((partialUser) => {
         if (!partialUser || !user) {
             return;
         }
@@ -101,7 +101,7 @@ export function AuthProvider({ children }) {
             ...merged,
             role: deriveRole(merged)
         });
-    };
+    }, [user]);
 
     const value = useMemo(
         () => ({
@@ -114,7 +114,7 @@ export function AuthProvider({ children }) {
             logout,
             updateUser
         }),
-        [token, user, isAuthenticated]
+        [token, user, isAuthenticated, login, register, logout, updateUser]
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

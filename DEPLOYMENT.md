@@ -57,6 +57,7 @@ Example: `mongodb+srv://user:pass@cluster.mongodb.net/database`
    - `MONGO_URI`: [Your MongoDB connection string]
    - `NODE_ENV`: `production`
    - `JWT_SECRET`: [A long random secret]
+   - `CORS_ORIGIN`: `https://<your-vercel-app>.vercel.app`
    - `CLOUDINARY_CLOUD_NAME`: [Your cloud name]
    - `CLOUDINARY_API_KEY`: [Your API key]
    - `CLOUDINARY_API_SECRET`: [Your API secret]
@@ -122,13 +123,13 @@ Expected response:
 
 ## Step 4: Configure CORS
 
-The backend requires CORS enabled. Verify in `app.js`:
+The backend uses a strict allowlist from `CORS_ORIGIN` (comma-separated). Verify in `app.js` and ensure your frontend domain is present:
 
 ```javascript
-app.use(cors());
+CORS_ORIGIN=https://your-frontend.vercel.app,https://preview-url.vercel.app
 ```
 
-This allows requests from any origin (secure for public APIs).
+Requests from origins outside this allowlist are rejected.
 
 ## Step 5: Verify Deployment
 
@@ -226,6 +227,7 @@ Navigate to your Vercel-deployed frontend URL and test:
 1. Ensure backend is on Render (not Vercel)
 2. Use `wss://` for secure WebSocket on production
 3. Check browser console for connection errors
+4. Verify `VITE_WS_URL` (or `VITE_API_URL`) is set in Vercel; the frontend now fails fast if missing in production
 
 ### Database Performance Issues
 
