@@ -1,0 +1,58 @@
+
+Overview
+Build a full-stack web application from scratch and deploy it. The app fetches data from a public API, stores it in a database, and displays it on the frontend with a real-time search feature.
+
+What to Build
+React frontend — built from scratch (no templates)
+Node.js + Express backend — built from scratch
+When the app loads, the backend fetches posts from JSONPlaceholder API  →  jsonplaceholder.typicode.com/posts
+Store those posts in MongoDB
+Frontend calls the backend REST API and displays the posts
+Search bar on the frontend uses WebSocket to query the backend in real time and show filtered results
+
+APIs to Build
+REST APIs
+More than 1 required. At minimum: fetch & save posts, get all posts, get single post.
+
+WebSocket API
+Minimum 1 required. Used for the search feature — client sends a search query, server responds with matching posts.
+
+Tech Stack
+Layer
+Technology
+Notes
+Frontend
+React.js
+create-react-app or Vite — your choice
+Backend
+Node.js + Express
+REST API + WebSocket server
+Database
+MongoDB
+Use MongoDB Atlas free tier
+WebSocket
+ws or socket.io
+For real-time search
+External API
+JSONPlaceholder
+jsonplaceholder.typicode.com/posts
+Deployment
+Vercel
+Frontend + backend both on Vercel
+
+GitHub Repository
+Single public monorepo — both frontend and backend in one repo
+Folder structure:   /frontend   and   /backend   at the root
+Include a README with: how to run locally, env variables needed, and the live URL
+Do not commit .env files or node_modules
+
+Deployment
+Deploy both frontend and backend on Vercel
+Share the public GitHub repo link and the live Vercel frontend URL
+Note: Vercel serverless functions may not support persistent WebSockets. If needed, deploy the WebSocket server on Railway or Render (free tier) and document it in your README.
+
+Submission
+Send both of the following:
+1.  Public GitHub repository URL
+2.  Live Vercel frontend URL
+

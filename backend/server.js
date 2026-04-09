@@ -1,0 +1,200 @@
+require('dotenv').config();
+
+const http = require('http');
+const { Server } = require('socket.io');
+const app = require('./app');
+const { connectDatabase, disconnectDatabase } = require('./config/db');
+const { attachSearchSocket } = require('./sockets/searchSocket');
+const { attachLikeSocket } = require('./sockets/likeSocket');
+const { attachNotificationSocket } = require('./sockets/notificationSocket');
+const { attachPostSocket } = require('./sockets/postSocket');
+const { attachPresenceSocket } = require('./sockets/presenceSocket');
+const { startSyncCronJob } = require('./jobs/syncCron');
+
+// Services
+const apiService = require('./services/apiService');
+
+// Models
+const Post = require('./models/Post');
+const User = require('./models/User');
+const Comment = require('./models/Comment');
+
+const PORT = Number(process.env.PORT) || 5000;
+
+/**
+ * Upsert helper function
+ */
+async function upsertData(Model, items, idField, normalizeFn) {
+    if (!Array.isArray(items) || items.length === 0) {
+        return { fetched: 0, upserted: 0, modified: 0 };
+    }
+
+    const operations = items.map((item) => ({
+        updateOne: {
+            filter: { [idField]: item.id },
+            update: { $set: normalizeFn(item) },
+            upsert: true
+        }
+    }));
+
+    const result = await Model.bulkWrite(operations, { ordered: false });
+    return {
+        fetched: items.length,
+        upserted: result.upsertedCount,
+        modified: result.modifiedCount
+    };
+}
+
+/**
+ * Bootstrap server with database and WebSocket
+ */
+async function bootstrap() {
+    try {
+        // Connect to MongoDB
+        await connectDatabase();
+        console.log('✓ Connected to MongoDB');
+
+        // Create HTTP server and Socket.io
+        const server = http.createServer(app);
+        const io = new Server(server, {
+            cors: {
+                origin: '*',
+                methods: ['GET', 'POST', 'PUT', 'DELETE']
+            },
+            transports: ['websocket', 'polling']
+        });
+
+        // Attach search socket handler
+        attachSearchSocket(io);
+        attachLikeSocket(io);
+        attachNotificationSocket(io);
+        attachPostSocket(io);
+        attachPresenceSocket(io);
+
+        // Start hourly fetch cron
+        const cronTask = startSyncCronJob();
+
+        // Seed data from external API on startup
+        console.log('\n📊 Seeding data from JSONPlaceholder API...');
+
+        try {
+            // Check if data already exists
+            const [postCount, userCount, commentCount] = await Promise.all([
+                Post.countDocuments(),
+                User.countDocuments(),
+                Comment.countDocuments()
+            ]);
+
+            if (postCount === 0) {
+                console.log('  ⬇️  Fetching posts...');
+                const postsResult = await apiService.fetchPosts();
+                if (postsResult.success) {
+                    const postsSummary = await upsertData(
+                        Post,
+                        postsResult.data,
+                        'postId',
+                        (p) => ({ id: p.id, postId: p.id, userId: p.userId, title: p.title, body: p.body, isExternal: true })
+                    );
+                    console.log(`  ✓ Posts seeded: ${postsSummary.upserted} upserted, ${postsSummary.modified} modified`);
+                }
+            } else {
+                console.log(`  ✓ Posts already exist (${postCount} documents)`);
+            }
+
+            if (userCount === 0) {
+                console.log('  ⬇️  Fetching users...');
+                const usersResult = await apiService.fetchUsers();
+                if (usersResult.success) {
+                    const usersSummary = await upsertData(
+                        User,
+                        usersResult.data,
+                        'userId',
+                        (u) => ({
+                            id: u.id,
+                            userId: u.id,
+                            name: u.name,
+                            username: u.username,
+                            email: u.email,
+                            address: u.address || {},
+                            phone: u.phone || '',
+                            website: u.website || '',
+                            company: u.company || {},
+                            isExternal: true
+                        })
+                    );
+                    console.log(`  ✓ Users seeded: ${usersSummary.upserted} upserted, ${usersSummary.modified} modified`);
+                }
+            } else {
+                console.log(`  ✓ Users already exist (${userCount} documents)`);
+            }
+
+            if (commentCount === 0) {
+                console.log('  ⬇️  Fetching comments...');
+                const commentsResult = await apiService.fetchComments();
+                if (commentsResult.success) {
+                    const commentsSummary = await upsertData(
+                        Comment,
+                        commentsResult.data,
+                        'commentId',
+                        (c) => ({
+                            id: c.id,
+                            commentId: c.id,
+                            userId: c.userId || c.postId || 1,
+                            postId: c.postId,
+                            parentCommentId: c.parentCommentId ?? null,
+                            name: c.name,
+                            email: c.email,
+                            body: c.body
+                        })
+                    );
+                    console.log(`  ✓ Comments seeded: ${commentsSummary.upserted} upserted, ${commentsSummary.modified} modified`);
+                }
+            } else {
+                console.log(`  ✓ Comments already exist (${commentCount} documents)`);
+            }
+        } catch (seedError) {
+            console.error('⚠️  Error during data seeding:', seedError.message);
+        }
+
+        // Start HTTP/WebSocket server
+        server.listen(PORT, () => {
+            console.log(`\n${'═'.repeat(60)}`);
+            console.log(`🚀 Real-Time Post Explorer Backend`);
+            console.log(`${'═'.repeat(60)}`);
+            console.log(`\n📍 HTTP Server`);
+            console.log(`   http://localhost:${PORT}`);
+            console.log(`\n🔌 WebSocket (Socket.io)`);
+            console.log(`   ws://localhost:${PORT}`);
+            console.log(`\n📡 API Endpoints`);
+            console.log(`   Health:   GET http://localhost:${PORT}/api/health`);
+            console.log(`   Posts:    GET http://localhost:${PORT}/api/posts`);
+            console.log(`   Users:    GET http://localhost:${PORT}/api/users`);
+            console.log(`   Comments: GET http://localhost:${PORT}/api/comments`);
+            console.log(`   Stats:    GET http://localhost:${PORT}/api/stats`);
+            console.log(`   Search:   GET http://localhost:${PORT}/api/search?q=query`);
+            console.log(`\n${'═'.repeat(60)}\n`);
+        });
+
+        // Graceful shutdown
+        const shutdown = async (signal) => {
+            console.log(`\n⏹️  Received ${signal}, shutting down gracefully...`);
+            server.close(() => {
+                console.log('  ✓ HTTP server closed');
+            });
+            cronTask.stop();
+            io.close();
+            await disconnectDatabase();
+            console.log('  ✓ Database connection closed');
+            process.exit(0);
+        };
+
+        process.on('SIGINT', () => shutdown('SIGINT'));
+        process.on('SIGTERM', () => shutdown('SIGTERM'));
+    } catch (error) {
+        console.error('❌ Failed to start backend:', error.message);
+        process.exit(1);
+    }
+}
+
+// Start the server
+bootstrap();
