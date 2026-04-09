@@ -1,92 +1,78 @@
-import { AnimatePresence, motion } from 'framer-motion';
-import { Bell, Compass, Home, User } from 'lucide-react';
+import { Home, Compass, Bell, User } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
-import { cn } from '../lib/utils';
+import { useAuth } from '../context/AuthContext';
 
 const NAV_ITEMS = [
-    { to: '/', label: 'Home', icon: Home },
-    { to: '/explore', label: 'Explore', icon: Compass },
-    { to: '/notifications', label: 'Notifications', icon: Bell },
-    { to: '/profile', label: 'Profile', icon: User }
+    { to: '/', label: 'Feed', icon: Home, color: '#e63946' },
+    { to: '/explore', label: 'Explore', icon: Compass, color: '#5c6bc0' },
+    { to: '/notifications', label: 'Following', icon: Bell, color: '#00897b' },
+    { to: '/profile', label: 'Saved', icon: User, color: '#ef6c00' }
 ];
 
 export default function LeftSidebar({ onOpenNotifications, mobileOpen = false, onClose, theme = 'dark' }) {
-    const navContent = (
-        <>
-            <div>
-                <div className="mb-5 px-2">
-                    <motion.div whileHover={{ rotate: -5, scale: 1.05 }} className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-volt/65 bg-volt text-ink font-display text-2xl">
-                        P
-                    </motion.div>
-                </div>
-
-                <nav className="space-y-1.5" aria-label="Primary">
-                    {NAV_ITEMS.map((item) => {
-                        const Icon = item.icon;
-
-                        return (
-                            <NavLink
-                                key={item.label}
-                                to={item.to}
-                                onClick={item.label === 'Notifications' ? (event) => {
-                                    event.preventDefault();
-                                    onOpenNotifications?.();
-                                    onClose?.();
-                                } : onClose}
-                                className={({ isActive }) =>
-                                    cn(
-                                        'group flex items-center gap-3 rounded-2xl px-3 py-3 ui-font text-xs uppercase tracking-[0.14em] transition',
-                                        'text-mist',
-                                        isActive
-                                            ? 'border border-volt/65 bg-volt/20 text-paper'
-                                            : 'border border-transparent hover:border-volt/40 hover:text-volt'
-                                    )
-                                }
-                            >
-                                <Icon className="h-4.5 w-4.5" />
-                                <span>{item.label}</span>
-                            </NavLink>
-                        );
-                    })}
-                </nav>
-            </div>
-
-            <p className="px-2 font-body text-sm italic text-mist">Curate your social graph in realtime.</p>
-        </>
-    );
+    const { user } = useAuth();
 
     return (
-        <>
-            <aside className="sticky top-[88px] hidden h-[calc(100vh-110px)] self-start lg:block">
-                <div className="editorial-surface flex h-full flex-col justify-between rounded-3xl border border-mist/30 p-4">
-                    {navContent}
+        <aside className="sticky top-[72px] hidden h-[calc(100vh-72px)] w-[250px] self-start overflow-y-auto pr-2 lg:block">
+            {/* Profile Card */}
+            <div className="bg-white rounded-lg border-[0.5px] border-[#e8e8e8] overflow-hidden mb-4">
+                {/* Banner */}
+                <div className="h-[50px] bg-gradient-to-r from-[#5c6bc0] to-[#7986cb]" />
+                
+                {/* Profile Body */}
+                <div className="p-3 pt-0">
+                    {/* Avatar */}
+                    <div
+                        className="h-12 w-12 rounded-full border-4 border-white flex items-center justify-center text-white font-semibold text-lg mt-[-24px] mb-2"
+                        style={{ backgroundColor: '#ef6c00' }}
+                    >
+                        {user?.username?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                    
+                    {/* Name & Title */}
+                    <p className="text-[13px] font-semibold text-[#111] mb-0.5">{user?.name || user?.username || 'Your Name'}</p>
+                    <p className="text-[11px] text-[#777]">Full Stack Developer</p>
+                    
+                    {/* Stats */}
+                    <div className="grid grid-cols-2 gap-1 mt-3 pt-3 border-t border-[#f5f5f5]">
+                        <div className="text-center">
+                            <p className="text-[15px] font-semibold text-[#111]">142</p>
+                            <p className="text-[10px] text-[#999]">Posts</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-[15px] font-semibold text-[#111]">2.4k</p>
+                            <p className="text-[10px] text-[#999]">Followers</p>
+                        </div>
+                    </div>
                 </div>
-            </aside>
+            </div>
 
-            <AnimatePresence>
-                {mobileOpen && (
-                    <>
-                        <motion.button
-                            type="button"
-                            aria-label="Close menu"
-                            onClick={onClose}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="fixed inset-0 z-40 bg-black/55 lg:hidden"
-                        />
-
-                        <motion.aside
-                            initial={{ x: -24, opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            exit={{ x: -22, opacity: 0 }}
-                            className="editorial-surface fixed left-3 top-20 z-50 h-[calc(100vh-96px)] w-[min(86vw,19rem)] rounded-3xl border border-mist/30 p-4 backdrop-blur-xl lg:hidden"
+            {/* Navigation List */}
+            <div className="bg-white rounded-lg border-[0.5px] border-[#e8e8e8] overflow-hidden">
+                {NAV_ITEMS.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                        <NavLink
+                            key={item.label}
+                            to={item.to}
+                            onClick={() => onOpenNotifications && item.label === 'Following' ? onOpenNotifications() : null}
+                            className={({ isActive }) =>
+                                `flex items-center gap-3 px-4 py-3 border-b-[0.5px] border-[#f5f5f5] last:border-b-0 text-[12px] font-semibold cursor-pointer transition ${
+                                    isActive
+                                        ? 'text-[#e63946]'
+                                        : 'text-[#444] hover:text-[#111]'
+                                }`
+                            }
                         >
-                            <div className="flex h-full flex-col justify-between">{navContent}</div>
-                        </motion.aside>
-                    </>
-                )}
-            </AnimatePresence>
-        </>
+                            <div
+                                className="h-2 w-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: item.color }}
+                            />
+                            {item.label}
+                        </NavLink>
+                    );
+                })}
+            </div>
+        </aside>
     );
 }

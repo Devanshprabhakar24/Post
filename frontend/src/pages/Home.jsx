@@ -7,6 +7,8 @@ import Loader from '../components/Loader';
 import PostModal from '../components/PostModal';
 import PostCard from '../components/PostCard';
 import TextReveal from '../components/TextReveal';
+import LeftSidebar from '../components/LeftSidebar';
+import RightPanel from '../components/RightPanel';
 import { useAuth } from '../context/AuthContext';
 import { useSocketContext } from '../context/SocketContext';
 import useDebounce from '../hooks/useDebounce';
@@ -514,106 +516,111 @@ export default function Home({
     }, [composerImagePreview]);
 
     return (
-        <section className="space-y-6 pb-6">
-            <header className="noise-divider editorial-surface rounded-3xl p-6">
-                <TextReveal
-                    text="WHAT'S HAPPENING"
-                    className="font-display text-[clamp(3.2rem,11vw,6rem)] leading-[0.86] text-paper"
+        <div className="bg-[#f0ede8] min-h-screen">
+            {/* Topbar */}
+            <nav className="bg-white border-b border-[0.5px] border-[#ddd] sticky top-0 z-40 px-4 h-[72px] flex items-center gap-4">
+                <div className="font-semibold text-lg text-[#111]">
+                    Post<span className="text-[#e63946]">.</span>
+                </div>
+                <input
+                    type="text"
+                    readOnly
+                    placeholder="Search people, posts, topics..."
+                    className="flex-1 bg-[#f3f3f3] border-none rounded-full px-4 py-2 text-[13px] text-[#555] placeholder-[#999]"
                 />
-                <div className="mt-3 h-[2px] w-36 bg-volt" />
-
-                <div className="mt-5 grid gap-2 rounded-2xl border border-mist/30 p-3 sm:grid-cols-3">
-                    <div className="rounded-xl border border-mist/25 px-3 py-2">
-                        <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-mist">Total posts</p>
-                        <p className="font-display text-4xl leading-none text-paper">{visiblePosts.length}</p>
-                    </div>
-                    <div className="rounded-xl border border-mist/25 px-3 py-2">
-                        <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-mist">Online users</p>
-                        <p className="font-display text-4xl leading-none text-paper">{onlineUsers?.length || 0}</p>
-                    </div>
-                    <div className="rounded-xl border border-mist/25 px-3 py-2">
-                        <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-mist">New today</p>
-                        <p className="font-display text-4xl leading-none text-paper">{posts.filter((item) => new Date(item.createdAt || 0).toDateString() === new Date().toDateString()).length}</p>
+                <div className="flex items-center gap-2 ml-auto">
+                    <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100">🏠</button>
+                    <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100">👥</button>
+                    <button className="relative w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100">
+                        🔔
+                        <div className="absolute top-2 right-2 w-2 h-2 bg-[#e63946] rounded-full" />
+                    </button>
+                    <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100">💬</button>
+                    <div className="w-9 h-9 rounded-full bg-[#5c6bc0] flex items-center justify-center text-white text-xs font-semibold">
+                        {user?.username?.charAt(0).toUpperCase() || 'U'}
                     </div>
                 </div>
+            </nav>
 
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setSortMode((prev) => (prev === 'liked' ? 'latest' : 'liked'))}
-                        className="rounded-full border border-mist/40 px-3 py-1 ui-font text-[11px] uppercase tracking-[0.14em] text-mist hover:border-volt hover:text-volt"
-                    >
-                        {sortMode === 'liked' ? 'Most liked' : 'Latest'}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setComposerOpen(true)}
-                        className="rounded-full border border-volt/70 bg-volt px-4 py-1 ui-font text-[11px] uppercase tracking-[0.14em] text-ink hover:bg-volt-dim"
-                    >
-                        Create post
-                    </button>
+            {/* Main Layout */}
+            <div className="flex max-w-7xl mx-auto px-4 py-3 gap-3">
+                {/* Left Sidebar */}
+                <LeftSidebar />
+
+                {/* Center Feed */}
+                <div className="flex-1 min-w-0">
+                    {/* Composer */}
+                    <div className="bg-white rounded-lg border-[0.5px] border-[#e8e8e8] p-4 mb-3 flex gap-3">
+                        <div
+                            className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center text-white text-xs font-semibold"
+                            style={{ backgroundColor: '#5c6bc0' }}
+                        >
+                            {user?.username?.charAt(0).toUpperCase() || 'U'}
+                        </div>
+                        <input
+                            type="text"
+                            onClick={() => setComposerOpen(true)}
+                            placeholder="What's on your mind?"
+                            readOnly
+                            className="flex-1 bg-[#f5f5f5] border-none rounded-full px-4 py-2 text-[13px] text-[#888] placeholder-[#999] cursor-pointer"
+                        />
+                        <div className="flex items-center gap-2">
+                            <button className="flex items-center gap-1 border border-[#ddd] px-3 py-1.5 rounded-full text-[12px] text-[#555] hover:bg-gray-50">
+                                📷 Photo
+                            </button>
+                            <button
+                                onClick={() => setComposerOpen(true)}
+                                className="bg-[#e63946] text-white border-none px-4 py-1.5 rounded-full text-[12px] font-semibold hover:bg-red-600"
+                            >
+                                Post
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Posts Feed */}
+                    {error && <div className="rounded-lg bg-red-50 border border-red-200 p-4 text-red-700 mb-3">{error}</div>}
+
+                    {loading ? (
+                        <Loader count={4} />
+                    ) : visiblePosts.length === 0 ? (
+                        <EmptyState />
+                    ) : (
+                        <motion.div
+                            className="space-y-3"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                        >
+                            <AnimatePresence>
+                                {visiblePosts.map((post, index) => (
+                                    <PostCard
+                                        key={post.postId}
+                                        index={index}
+                                        post={post}
+                                        query={debouncedQuery}
+                                        onToggleLike={handleLikeToggle}
+                                        isLiking={likingIds.has(post.postId)}
+                                        onOpenPreview={handleOpenPreview}
+                                        onOpenDetails={() => handleOpenDetails(post.postId)}
+                                        canDelete={isAdmin || String(post.userId) === String(user?.userId)}
+                                        isOwnPost={String(post.userId) === String(user?.userId)}
+                                        onDelete={handleDeletePost}
+                                        onTagClick={(tag) => navigate(`/hashtags/${String(tag || '').toLowerCase()}`)}
+                                        isLive={Boolean(livePulseIds[post.postId])}
+                                    />
+                                ))}
+                            </AnimatePresence>
+                        </motion.div>
+                    )}
+
+                    {!debouncedQuery.trim() && <div ref={sentinelRef} className="h-8 w-full" aria-hidden="true" />}
+                    {!debouncedQuery.trim() && isLoadingMore && <Loader count={2} />}
                 </div>
-            </header>
 
-            {selectedHashtag && (
-                <div className="inline-flex items-center gap-2 rounded-full border border-volt/50 px-3 py-1 ui-font text-xs uppercase tracking-[0.14em] text-volt">
-                    #{selectedHashtag}
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setSelectedHashtag('');
-                            if (forcedHashtag) {
-                                navigate('/explore');
-                            }
-                        }}
-                        className="text-mist hover:text-paper"
-                    >
-                        Clear
-                    </button>
-                </div>
-            )}
+                {/* Right Sidebar */}
+                <RightPanel users={users} posts={visiblePosts} />
+            </div>
 
-            <p className="sr-only" aria-live="polite">
-                {searching ? 'Searching posts' : `Showing ${visiblePosts.length} ${visiblePosts.length === 1 ? 'post' : 'posts'}`}
-            </p>
-
-            {error && <div className="rounded-2xl border border-ember/45 bg-ember/10 p-4 font-ui text-sm text-ember">{error}</div>}
-
-            {loading ? (
-                <Loader count={8} />
-            ) : visiblePosts.length === 0 ? (
-                <EmptyState />
-            ) : (
-                <motion.div
-                    className="columns-1 gap-4 space-y-0 md:columns-2"
-                    initial={reduced ? { opacity: 1 } : { opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                >
-                    <AnimatePresence>
-                        {visiblePosts.map((post, index) => (
-                            <PostCard
-                                key={post.postId}
-                                index={index}
-                                post={post}
-                                query={debouncedQuery}
-                                onToggleLike={handleLikeToggle}
-                                isLiking={likingIds.has(post.postId)}
-                                onOpenPreview={handleOpenPreview}
-                                onOpenDetails={() => handleOpenDetails(post.postId)}
-                                canDelete={isAdmin || String(post.userId) === String(user?.userId)}
-                                isOwnPost={String(post.userId) === String(user?.userId)}
-                                onDelete={handleDeletePost}
-                                onTagClick={(tag) => navigate(`/hashtags/${String(tag || '').toLowerCase()}`)}
-                                isLive={Boolean(livePulseIds[post.postId])}
-                            />
-                        ))}
-                    </AnimatePresence>
-                </motion.div>
-            )}
-
-            {!debouncedQuery.trim() && <div ref={sentinelRef} className="h-8 w-full" aria-hidden="true" />}
-            {!debouncedQuery.trim() && isLoadingMore && <Loader count={2} />}
-
+            {/* Post Modal */}
             <PostModal
                 open={Boolean(previewPost)}
                 post={previewPost}
@@ -623,6 +630,7 @@ export default function Home({
                 liking={previewPost ? likingIds.has(previewPost.postId) : false}
             />
 
+            {/* Composer Modal */}
             <AnimatePresence>
                 {composerOpen && (
                     <>
@@ -638,47 +646,55 @@ export default function Home({
 
                         <motion.form
                             onSubmit={handleCreatePost}
-                            initial={reduced ? { opacity: 1 } : { opacity: 0, y: 24, scale: 0.96 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={reduced ? { opacity: 1 } : { opacity: 0, y: 12, scale: 0.97 }}
+                            initial={{ opacity: 0, y: 24 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 12 }}
                             className="fixed inset-0 z-[92] grid place-items-center p-4"
                         >
-                            <div className="editorial-surface w-full max-w-2xl rounded-3xl p-5">
-                                <h3 className="font-display text-5xl text-paper">Create Story</h3>
-                                <p className="font-body italic text-mist">Publish something worth clipping.</p>
+                            <div className="bg-white rounded-lg w-full max-w-xl border border-[#e8e8e8] p-6">
+                                <h3 className="text-2xl font-semibold text-[#111] mb-2">Create Post</h3>
+                                <p className="text-[13px] text-[#999] mb-4">Share your thoughts with the community</p>
 
-                                <div className="mt-4 space-y-3">
+                                <div className="space-y-3">
                                     <input
                                         value={composer.title}
                                         onChange={(event) => setComposer((prev) => ({ ...prev, title: event.target.value }))}
-                                        placeholder="Headline"
-                                        className="w-full rounded-xl border border-mist/35 bg-transparent px-3 py-3 font-display text-3xl text-paper focus:border-volt focus:outline-none"
+                                        placeholder="Title"
+                                        className="w-full rounded-lg border border-[#e8e8e8] px-4 py-2 text-sm font-semibold text-[#111] focus:border-[#e63946] focus:outline-none"
                                     />
                                     <textarea
                                         value={composer.body}
                                         onChange={(event) => setComposer((prev) => ({ ...prev, body: event.target.value }))}
-                                        placeholder="Write the post body"
+                                        placeholder="Write your post body..."
                                         rows={6}
-                                        className="w-full rounded-xl border border-mist/35 bg-transparent px-3 py-3 font-body text-lg italic text-paper focus:border-volt focus:outline-none"
+                                        className="w-full rounded-lg border border-[#e8e8e8] px-4 py-2 text-[13px] text-[#333] focus:border-[#e63946] focus:outline-none"
                                     />
 
                                     <input
                                         type="file"
                                         accept="image/*"
                                         onChange={handleComposerImageChange}
-                                        className="block w-full rounded-xl border border-dashed border-mist/40 p-3 font-ui text-xs text-mist"
+                                        className="block w-full border-dashed border-2 border-[#ddd] rounded-lg p-4 text-[12px] text-[#999] file:hidden cursor-pointer hover:border-[#e63946]"
                                     />
 
                                     {composerImagePreview && (
-                                        <img src={composerImagePreview} alt="preview" className="h-56 w-full rounded-xl object-cover" />
+                                        <img src={composerImagePreview} alt="preview" className="w-full h-40 rounded-lg object-cover" />
                                     )}
                                 </div>
 
-                                <div className="mt-4 flex justify-end gap-2">
-                                    <button type="button" onClick={() => setComposerOpen(false)} className="rounded-full border border-mist/35 px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-mist">
+                                <div className="flex justify-end gap-2 mt-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setComposerOpen(false)}
+                                        className="px-4 py-2 rounded-full border border-[#ddd] text-[12px] font-semibold text-[#555] hover:bg-gray-50"
+                                    >
                                         Cancel
                                     </button>
-                                    <button type="submit" disabled={creatingPost} className="rounded-full border border-volt/80 bg-volt px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-ink disabled:opacity-60">
+                                    <button
+                                        type="submit"
+                                        disabled={creatingPost}
+                                        className="px-4 py-2 rounded-full bg-[#e63946] text-white text-[12px] font-semibold hover:bg-red-600 disabled:opacity-60"
+                                    >
                                         {creatingPost ? 'Publishing...' : 'Publish'}
                                     </button>
                                 </div>
@@ -687,6 +703,6 @@ export default function Home({
                     </>
                 )}
             </AnimatePresence>
-        </section>
+        </div>
     );
 }

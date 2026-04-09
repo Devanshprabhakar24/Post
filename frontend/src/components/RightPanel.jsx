@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Flame, Hash, UserPlus2 } from 'lucide-react';
+import { Flame, UserPlus2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -20,8 +20,8 @@ function getTrendingHashtags(posts) {
 
     return Array.from(countMap.entries())
         .sort((a, b) => b[1] - a[1])
-        .slice(0, 6)
-        .map(([tag, count]) => ({ tag, count }));
+        .slice(0, 4)
+        .map(([tag, count]) => ({ tag: tag.charAt(0).toUpperCase() + tag.slice(1), count }));
 }
 
 export default function RightPanel({ users = [], posts = [] }) {
@@ -51,7 +51,7 @@ export default function RightPanel({ users = [], posts = [] }) {
             return pool
                 .filter((entry) => Number(entry.userId) !== currentUserId)
                 .sort((a, b) => Number(b.userId) - Number(a.userId))
-                .slice(0, 4);
+                .slice(0, 3);
         },
         [user?.userId, uniqueUsers]
     );
@@ -78,65 +78,67 @@ export default function RightPanel({ users = [], posts = [] }) {
         }
     };
 
+    const getAvatarColor = (userId) => {
+        const colors = ['#7b1fa2', '#00695c', '#d32f2f', '#5c6bc0', '#ef6c00', '#f4511e'];
+        return colors[Number(userId || 0) % colors.length];
+    };
+
     return (
-        <aside className="sticky top-[88px] hidden h-[calc(100vh-110px)] space-y-4 self-start overflow-y-auto pr-1 lg:block">
-            <section className="editorial-surface rounded-3xl border border-mist/30 p-4">
-                <h3 className="mb-3 inline-flex items-center gap-2 font-display text-3xl leading-none text-paper">
-                    <Flame className="h-4 w-4 text-ember" /> Trending
-                </h3>
-
+        <aside className="sticky top-[72px] hidden h-[calc(100vh-72px)] w-[200px] self-start overflow-y-auto pl-2 lg:block">
+            {/* Trending Card */}
+            <div className="bg-white rounded-lg border-[0.5px] border-[#e8e8e8] p-4 mb-4">
+                <h3 className="text-[12px] font-semibold text-[#111] mb-3">Trending topics</h3>
                 <div className="space-y-2">
-                    {trendingHashtags.length === 0 ? (
-                        <p className="font-body text-sm italic text-mist">No hashtags yet.</p>
-                    ) : (
-                        trendingHashtags.map((item) => (
-                            <Link
-                                key={item.tag}
-                                to={`/hashtags/${item.tag}`}
-                                className="flex items-center justify-between rounded-xl border border-mist/30 bg-ink/25 px-3 py-2 font-ui text-xs uppercase tracking-[0.14em] text-paper transition hover:border-volt/55 hover:text-volt"
-                            >
-                                <span className="inline-flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> {item.tag}</span>
-                                <span className="text-xs text-mist">{item.count}</span>
-                            </Link>
-                        ))
-                    )}
+                    {trendingHashtags.map((item) => (
+                        <div key={item.tag} className="pb-3 border-b-[0.5px] border-[#f5f5f5] last:border-b-0">
+                            <p className="text-[12px] font-semibold text-[#e63946]">#{item.tag}</p>
+                            <p className="text-[10px] text-[#bbb] mt-0.5">{item.count}k posts today</p>
+                        </div>
+                    ))}
                 </div>
-            </section>
+            </div>
 
-            <section className="editorial-surface rounded-3xl border border-mist/30 p-4">
-                <h3 className="mb-3 inline-flex items-center gap-2 font-display text-3xl leading-none text-paper">
-                    <UserPlus2 className="h-4 w-4 text-volt" /> Follow
-                </h3>
-
-                <div className="space-y-2.5">
+            {/* People to Follow Card */}
+            <div className="bg-white rounded-lg border-[0.5px] border-[#e8e8e8] p-4 mb-4">
+                <h3 className="text-[12px] font-semibold text-[#111] mb-3">People to follow</h3>
+                <div className="space-y-3">
                     {suggestions.map((entry) => {
                         const isFollowing = Boolean(followingState[entry.userId]);
+                        const avatarColor = getAvatarColor(entry.userId);
 
                         return (
-                            <div key={entry.userId} className="flex items-center justify-between rounded-xl border border-mist/30 bg-ink/25 px-3 py-2">
-                                <Link to={`/profile/${entry.userId}`} className="min-w-0">
-                                    <p className="truncate font-display text-2xl leading-none text-paper">{entry.name}</p>
-                                    <p className="truncate ui-font text-[10px] uppercase tracking-[0.14em] text-mist">@{entry.username || entry.email}</p>
-                                </Link>
-
+                            <div key={entry.userId} className="flex items-center gap-2 pb-3 border-b-[0.5px] border-[#f5f5f5] last:border-b-0">
+                                <div
+                                    className="flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center text-white text-[11px] font-semibold"
+                                    style={{ backgroundColor: avatarColor }}
+                                >
+                                    {entry.name?.charAt(0).toUpperCase() || 'U'}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[12px] font-semibold text-[#111] truncate">{entry.name}</p>
+                                    <p className="text-[10px] text-[#999]">@{entry.username}</p>
+                                </div>
                                 <button
-                                    type="button"
                                     onClick={() => handleFollowToggle(entry.userId)}
                                     disabled={pendingId === entry.userId}
-                                    className="group relative min-w-[84px] rounded-full border border-volt/75 bg-volt px-3 py-1.5 ui-font text-[10px] uppercase tracking-[0.14em] text-ink transition hover:bg-volt-dim disabled:opacity-70"
+                                    className="flex-shrink-0 h-6 px-2 rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600 hover:bg-gray-200 border-[0.5px] border-[#ddd]"
                                 >
-                                    {pendingId === entry.userId ? '...' : isFollowing ? 'Following' : 'Follow'}
-                                    {isFollowing && (
-                                        <span className="pointer-events-none absolute inset-0 hidden items-center justify-center rounded-full bg-ember text-ink group-hover:flex">
-                                            Unfollow
-                                        </span>
-                                    )}
+                                    {isFollowing ? 'Following' : 'Follow'}
                                 </button>
                             </div>
                         );
                     })}
                 </div>
-            </section>
+            </div>
+
+            {/* Premium Card */}
+            <div className="bg-[#e63946] rounded-lg overflow-hidden text-white p-4">
+                <p className="text-[13px] font-semibold mb-1">Go Premium</p>
+                <p className="text-[11px] opacity-90 mb-3">Unlock analytics, verified badge & priority reach</p>
+                <button className="w-full bg-white text-[#e63946] font-semibold text-[12px] py-2 rounded-full hover:bg-gray-50">
+                    Upgrade now
+                </button>
+            </div>
         </aside>
     );
 }
