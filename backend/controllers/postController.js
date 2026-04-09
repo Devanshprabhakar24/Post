@@ -1,18 +1,21 @@
 const Post = require('../models/Post');
+const PostLike = require('../models/PostLike');
 const User = require('../models/User');
 const Comment = require('../models/Comment');
+const mongoose = require('mongoose');
 const {
     fetchPosts: fetchSourcePosts,
     fetchUsers: fetchSourceUsers,
     fetchComments: fetchSourceComments
 } = require('../services/apiService');
-const { searchPostsWithUsers, searchPostsRealtime } = require('../services/searchService');
+const { searchPostsWithUsers, searchPostsRealtime, analyzeSearchQueryPerformance } = require('../services/searchService');
 const { emitLikeUpdated } = require('../sockets/likeSocket');
 const { createNotification } = require('../services/notificationService');
 const { emitNewPost } = require('../sockets/postSocket');
 const { extractHashtags, normalizeHashtag } = require('../utils/hashtags');
 const cache = require('../utils/cache');
-const { uploadBufferToMedia } = require('../services/cloudinaryUploadService');
+const { processUpload } = require('../jobs/uploadQueue');
+const { bufferLikeDelta } = require('../jobs/likeFlushJob');
 
 const CACHE_TTL = {
     postsList: 60 * 1000,
@@ -29,6 +32,7 @@ function buildCacheKey(prefix, value) {
 
 function invalidatePostCaches(postId) {
     cache.clearByPrefix('posts:list:');
+    cache.clearByPrefix('feed:');
     cache.clearByPrefix('search:');
     cache.clearByPrefix('stats:');
     cache.clearByPrefix('posts:top-liked');
@@ -85,12 +89,11 @@ function normalizeComment(comment) {
 }
 
 function sanitizePost(post) {
-    const likedBy = Array.isArray(post?.likedBy) ? post.likedBy : [];
     const likes = Number(post?.likes) || 0;
     return {
         ...post,
         likes,
-        likedBy
+        likedBy: []
     };
 }
 
@@ -245,15 +248,12 @@ async function fetchAndStoreData(_req, res) {
             {
                 $or: [
                     { likes: { $exists: false } },
-                    { likedBy: { $exists: false } },
-                    { likedBy: { $type: 'string' } },
                     { isExternal: { $exists: false } }
                 ]
             },
             {
                 $set: {
                     likes: 0,
-                    likedBy: [],
                     isExternal: true
                 }
             }
@@ -368,7 +368,7 @@ async function createPost(req, res) {
         let resolvedImageContentType = '';
 
         if (req.file?.buffer) {
-            const uploadResult = await uploadBufferToMedia(req.file.buffer, {
+            const uploadResult = await processUpload(req.file.buffer, {
                 folder: 'post_images',
                 mimetype: req.file.mimetype,
                 transformation: [
@@ -396,7 +396,6 @@ async function createPost(req, res) {
             imageContentType: resolvedImageContentType,
             hashtags,
             likes: 0,
-            likedBy: [],
             isExternal: false
         });
 
@@ -546,6 +545,8 @@ async function getAllPosts(req, res) {
     try {
         const page = Math.max(1, parseInt(req.query.page) || 1);
         const limit = Math.min(100, parseInt(req.query.limit) || 10);
+        const cursor = String(req.query.cursor || '').trim();
+        const useCursor = Boolean(cursor) && mongoose.Types.ObjectId.isValid(cursor);
         const userId = req.query.userId ? parseInt(req.query.userId) : null;
         const keyword = req.query.keyword ? String(req.query.keyword).trim() : null;
         const hashtag = req.query.hashtag ? normalizeHashtag(req.query.hashtag) : '';
@@ -573,11 +574,21 @@ async function getAllPosts(req, res) {
             query.hashtags = hashtag;
         }
 
-        const skip = (page - 1) * limit;
-        const cacheKey = buildCacheKey(
-            'posts:list',
-            JSON.stringify({ page, limit, userId, keyword, hashtag, sortOrder, sortField })
-        );
+        if (useCursor) {
+            query._id = { $lt: new mongoose.Types.ObjectId(cursor) };
+        }
+
+        const cacheKey = [
+            'feed',
+            `p${page}`,
+            `c${useCursor ? cursor : '_'}`,
+            `l${limit}`,
+            `u${Number.isFinite(userId) ? userId : 'all'}`,
+            `q${keyword ? encodeURIComponent(keyword.toLowerCase()) : '_'}`,
+            `h${hashtag || '_'}`,
+            `s${sortField}`,
+            `o${sortOrder}`
+        ].join(':');
 
         const payload = await cache.remember(cacheKey, CACHE_TTL.postsList, async () => {
             const [result] = await Post.aggregate([
@@ -586,7 +597,7 @@ async function getAllPosts(req, res) {
                     $facet: {
                         data: [
                             { $sort: { [sortField]: sortOrder } },
-                            { $skip: skip },
+                            ...(useCursor ? [] : [{ $skip: (page - 1) * limit }]),
                             { $limit: limit },
                             {
                                 $lookup: {
@@ -618,37 +629,16 @@ async function getAllPosts(req, res) {
                                 }
                             },
                             {
-                                $lookup: {
-                                    from: 'comments',
-                                    let: { postId: '$postId' },
-                                    pipeline: [
-                                        {
-                                            $match: {
-                                                $expr: {
-                                                    $eq: ['$postId', '$$postId']
-                                                }
-                                            }
-                                        },
-                                        { $count: 'count' }
-                                    ],
-                                    as: 'commentsMeta'
-                                }
-                            },
-                            {
                                 $addFields: {
                                     author: { $arrayElemAt: ['$author', 0] },
-                                    commentsCount: {
-                                        $ifNull: [{ $arrayElemAt: ['$commentsMeta.count', 0] }, 0]
-                                    },
                                     likes: { $ifNull: ['$likes', 0] },
-                                    likedBy: { $ifNull: ['$likedBy', []] },
                                     hashtags: { $ifNull: ['$hashtags', []] },
                                     imageUrl: { $ifNull: ['$imageUrl', ''] }
                                 }
                             },
                             {
                                 $project: {
-                                    _id: 0,
+                                    _id: 1,
                                     postId: 1,
                                     userId: 1,
                                     title: 1,
@@ -656,7 +646,6 @@ async function getAllPosts(req, res) {
                                     imageUrl: 1,
                                     hashtags: 1,
                                     likes: 1,
-                                    likedBy: 1,
                                     commentsCount: 1,
                                     createdAt: 1,
                                     updatedAt: 1,
@@ -678,11 +667,41 @@ async function getAllPosts(req, res) {
             ]);
 
             const total = result?.meta?.[0]?.total || 0;
-            const data = Array.isArray(result?.data) ? result.data.map(sanitizePost) : [];
+            const rawPosts = Array.isArray(result?.data) ? result.data : [];
+            const postIds = rawPosts
+                .map((post) => Number(post?.postId))
+                .filter((postId) => Number.isFinite(postId));
+
+            const groupedCounts = postIds.length
+                ? await Comment.aggregate([
+                    { $match: { postId: { $in: postIds } } },
+                    { $group: { _id: '$postId', count: { $sum: 1 } } }
+                ])
+                : [];
+
+            const commentsCountMap = groupedCounts.reduce((acc, item) => {
+                const key = Number(item?._id);
+                if (Number.isFinite(key)) {
+                    acc[key] = Number(item?.count) || 0;
+                }
+                return acc;
+            }, {});
+
+            const data = rawPosts.map((post) => sanitizePost({
+                ...post,
+                commentsCount: commentsCountMap[Number(post.postId)] || 0
+            }));
+
+            const lastCursor = data.length > 0 ? String(data[data.length - 1]._id || '') : null;
+            const normalizedPosts = data.map((post) => {
+                const { _id, ...rest } = post;
+                return rest;
+            });
 
             return {
-                posts: data,
-                total
+                posts: normalizedPosts,
+                total,
+                lastCursor
             };
         });
 
@@ -693,7 +712,8 @@ async function getAllPosts(req, res) {
                 page,
                 limit,
                 total: payload.total,
-                pages: Math.ceil(payload.total / limit)
+                pages: Math.ceil(payload.total / limit),
+                cursor: payload.lastCursor || null
             },
             message: 'Posts fetched successfully'
         });
@@ -745,7 +765,6 @@ async function getPostById(req, res) {
                     $addFields: {
                         author: { $arrayElemAt: ['$author', 0] },
                         likes: { $ifNull: ['$likes', 0] },
-                        likedBy: { $ifNull: ['$likedBy', []] },
                         hashtags: { $ifNull: ['$hashtags', []] },
                         imageUrl: { $ifNull: ['$imageUrl', ''] }
                     }
@@ -760,7 +779,6 @@ async function getPostById(req, res) {
                         imageUrl: 1,
                         hashtags: 1,
                         likes: 1,
-                        likedBy: 1,
                         createdAt: 1,
                         updatedAt: 1,
                         author: {
@@ -893,6 +911,49 @@ async function search(req, res) {
     }
 }
 
+async function searchDiagnostics(req, res) {
+    try {
+        const diagnosticsEnabled =
+            process.env.NODE_ENV !== 'production' ||
+            String(process.env.ENABLE_SEARCH_DIAGNOSTICS || '').trim().toLowerCase() === 'true';
+
+        if (!diagnosticsEnabled) {
+            return res.status(403).json({
+                success: false,
+                message: 'Search diagnostics are disabled in this environment'
+            });
+        }
+
+        const query = req.query.q ? String(req.query.q).trim() : '';
+        const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 50));
+
+        if (!query || query.length < 3) {
+            return res.status(400).json({
+                success: false,
+                message: 'Search query must be at least 3 characters'
+            });
+        }
+
+        const diagnostics = await analyzeSearchQueryPerformance(query, limit);
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                query,
+                limit,
+                diagnostics
+            },
+            message: 'Search diagnostics fetched successfully'
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to compute search diagnostics',
+            error: process.env.NODE_ENV === 'development' ? error : undefined
+        });
+    }
+}
+
 /**
  * Search posts in database for WebSocket handler
  */
@@ -915,28 +976,37 @@ async function likePost(req, res) {
             return res.status(400).json({ success: false, data: null, message: 'userId is required' });
         }
 
-        const updated = await Post.findOneAndUpdate(
-            { postId, likedBy: { $ne: authUserId } },
-            {
-                $addToSet: { likedBy: authUserId },
-                $inc: { likes: 1 }
-            },
-            { new: true }
-        ).lean();
-
-        const post = updated || (await Post.findOne({ postId }).lean());
+        const post = await Post.findOne({ postId }).lean();
         if (!post) {
             return res.status(404).json({ success: false, data: null, message: 'Post not found' });
         }
 
-        const likedBy = Array.isArray(post.likedBy) ? post.likedBy : [];
-        const totalLikes = Number(post.likes) || 0;
-        const author = await User.findOne({ userId: post.userId })
-            .select({ _id: 0, userId: 1, name: 1, username: 1, email: 1 })
-            .lean();
-        const actor = await User.findOne({ userId: authUserId })
-            .select({ _id: 0, userId: 1, name: 1, username: 1 })
-            .lean();
+        const [existsLike, author, actor] = await Promise.all([
+            PostLike.exists({ postId, userId: authUserId }),
+            User.findOne({ userId: post.userId })
+                .select({ _id: 0, userId: 1, name: 1, username: 1, email: 1 })
+                .lean(),
+            User.findOne({ userId: authUserId })
+                .select({ _id: 0, userId: 1, name: 1, username: 1 })
+                .lean()
+        ]);
+
+        if (existsLike) {
+            return res.status(200).json({
+                success: true,
+                data: {
+                    postId,
+                    totalLikes: Number(post.likes) || 0,
+                    likedBy: []
+                },
+                message: 'Post was already liked by this user'
+            });
+        }
+
+        await PostLike.create({ postId, userId: authUserId });
+        await bufferLikeDelta(postId, 1);
+
+        const totalLikes = Math.max(0, Number(post.likes) + 1);
 
         emitLikeUpdated({
             postId,
@@ -944,7 +1014,7 @@ async function likePost(req, res) {
             postUserId: post.userId,
             author: author || null,
             totalLikes,
-            likedBy
+            likedBy: []
         });
 
         await createNotification({
@@ -961,9 +1031,9 @@ async function likePost(req, res) {
             data: {
                 postId,
                 totalLikes,
-                likedBy
+                likedBy: []
             },
-            message: updated ? 'Post liked successfully' : 'Post was already liked by this user'
+            message: 'Post liked successfully'
         });
     } catch (error) {
         return res.status(500).json({ success: false, data: null, message: 'Failed to like post' });
@@ -983,27 +1053,17 @@ async function unlikePost(req, res) {
             return res.status(400).json({ success: false, data: null, message: 'userId is required' });
         }
 
-        const updated = await Post.findOneAndUpdate(
-            { postId, likedBy: authUserId },
-            {
-                $pull: { likedBy: authUserId },
-                $inc: { likes: -1 }
-            },
-            { new: true }
-        ).lean();
-
-        const post = updated || (await Post.findOne({ postId }).lean());
+        const post = await Post.findOne({ postId }).lean();
         if (!post) {
             return res.status(404).json({ success: false, data: null, message: 'Post not found' });
         }
 
-        const likedBy = Array.isArray(post.likedBy) ? post.likedBy : [];
-        let totalLikes = Number(post.likes) || 0;
-
-        if (totalLikes < 0) {
-            await Post.updateOne({ postId }, { $set: { likes: 0 } });
-            totalLikes = 0;
+        const deleted = await PostLike.deleteOne({ postId, userId: authUserId });
+        if (deleted.deletedCount > 0) {
+            await bufferLikeDelta(postId, -1);
         }
+
+        const totalLikes = Math.max(0, Number(post.likes) + (deleted.deletedCount > 0 ? -1 : 0));
 
         const author = await User.findOne({ userId: post.userId })
             .select({ _id: 0, userId: 1, name: 1, username: 1, email: 1 })
@@ -1015,7 +1075,7 @@ async function unlikePost(req, res) {
             postUserId: post.userId,
             author: author || null,
             totalLikes,
-            likedBy
+            likedBy: []
         });
         invalidatePostCaches(postId);
 
@@ -1024,9 +1084,9 @@ async function unlikePost(req, res) {
             data: {
                 postId,
                 totalLikes,
-                likedBy
+                likedBy: []
             },
-            message: updated ? 'Post unliked successfully' : 'Post was not liked by this user'
+            message: deleted.deletedCount > 0 ? 'Post unliked successfully' : 'Post was not liked by this user'
         });
     } catch (error) {
         return res.status(500).json({ success: false, data: null, message: 'Failed to unlike post' });
@@ -1047,15 +1107,17 @@ async function getLikeStatus(req, res) {
             return res.status(404).json({ success: false, data: null, message: 'Post not found' });
         }
 
-        const likedBy = Array.isArray(post.likedBy) ? post.likedBy : [];
         const totalLikes = Number(post.likes) || 0;
+        const isLiked = Number.isFinite(authUserId)
+            ? Boolean(await PostLike.exists({ postId, userId: authUserId }))
+            : false;
 
         return res.status(200).json({
             success: true,
             data: {
                 postId,
                 totalLikes,
-                isLiked: Number.isFinite(authUserId) ? likedBy.includes(authUserId) : false
+                isLiked
             },
             message: 'Like status fetched successfully'
         });
@@ -1068,7 +1130,7 @@ async function getTopLikedPosts(_req, res) {
     try {
         const posts = await cache.remember('posts:top-liked', CACHE_TTL.topLiked, async () =>
             Post.find()
-                .select({ _id: 0, postId: 1, userId: 1, title: 1, body: 1, imageUrl: 1, hashtags: 1, likes: 1, likedBy: 1, createdAt: 1, updatedAt: 1 })
+                .select({ _id: 0, postId: 1, userId: 1, title: 1, body: 1, imageUrl: 1, hashtags: 1, likes: 1, createdAt: 1, updatedAt: 1 })
                 .sort({ likes: -1, createdAt: -1 })
                 .limit(10)
                 .lean()
@@ -1169,6 +1231,7 @@ module.exports = {
     getPostById,
     getPostComments,
     search,
+    searchDiagnostics,
     searchPostsInDatabase,
     likePost,
     unlikePost,

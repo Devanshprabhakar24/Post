@@ -1,9 +1,26 @@
 let ioInstance = null;
+const pendingByPost = new Map();
+const emitTimers = new Map();
 
-function attachLikeSocket(io) {
-    ioInstance = io;
+function flushPostLike(postId) {
+    const payload = pendingByPost.get(postId);
+    if (!payload || !ioInstance) {
+        pendingByPost.delete(postId);
+        emitTimers.delete(postId);
+        return;
+    }
 
-    io.on('connection', (socket) => {
+    ioInstance.emit('likeUpdated', payload);
+    ioInstance.to(`post:${postId}`).emit('likeUpdated', payload);
+
+    pendingByPost.delete(postId);
+    emitTimers.delete(postId);
+}
+
+function attachLikeSocket(namespace) {
+    ioInstance = namespace;
+
+    namespace.on('connection', (socket) => {
         socket.on('joinPost', (postId) => {
             const normalized = Number(postId);
             if (!Number.isNaN(normalized) && normalized > 0) {
@@ -18,9 +35,20 @@ function emitLikeUpdated(payload) {
         return;
     }
 
-    ioInstance.emit('likeUpdated', payload);
-    if (payload?.postId) {
-        ioInstance.to(`post:${payload.postId}`).emit('likeUpdated', payload);
+    const postId = Number(payload?.postId);
+    if (!Number.isFinite(postId) || postId < 1) {
+        ioInstance.emit('likeUpdated', payload);
+        return;
+    }
+
+    pendingByPost.set(postId, payload);
+    if (!emitTimers.has(postId)) {
+        emitTimers.set(
+            postId,
+            setTimeout(() => {
+                flushPostLike(postId);
+            }, 1000)
+        );
     }
 }
 

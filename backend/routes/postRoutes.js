@@ -15,7 +15,8 @@ const {
     getLikeStatus,
     getTopLikedPosts,
     getTrendingPosts,
-    search
+    search,
+    searchDiagnostics
 } = require('../controllers/postController');
 
 const router = express.Router();
@@ -33,6 +34,7 @@ router.delete('/:id', authMiddleware, deletePost);
 router.get('/top-liked', getTopLikedPosts);
 router.get('/trending', getTrendingPosts);
 router.get('/search', searchLimiter, search);
+router.get('/search/diagnostics', authMiddleware, searchDiagnostics);
 
 // Get all posts with pagination and filtering
 router.get('/', getAllPosts);

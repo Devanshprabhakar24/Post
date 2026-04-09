@@ -17,7 +17,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }) {
                 type="button"
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage <= 1}
-                className="rounded-xl border border-slate-700 bg-slate-900/70 px-4 py-2 text-sm text-slate-200 transition hover:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl border border-mist/35 bg-ink/30 px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-mist transition hover:border-volt hover:text-volt disabled:cursor-not-allowed disabled:opacity-50"
             >
                 Prev
             </button>
@@ -27,10 +27,10 @@ export default function Pagination({ currentPage, totalPages, onPageChange }) {
                     type="button"
                     key={page}
                     onClick={() => onPageChange(page)}
-                    className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
+                    className={`rounded-xl px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] transition ${
                         page === currentPage
-                            ? 'bg-cyan-500 text-slate-950'
-                            : 'border border-slate-700 bg-slate-900/70 text-slate-200 hover:border-cyan-400'
+                            ? 'border border-volt/75 bg-volt text-ink'
+                            : 'border border-mist/35 bg-ink/30 text-mist hover:border-volt hover:text-volt'
                     }`}
                 >
                     {page}
@@ -41,7 +41,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }) {
                 type="button"
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage >= totalPages}
-                className="rounded-xl border border-slate-700 bg-slate-900/70 px-4 py-2 text-sm text-slate-200 transition hover:border-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl border border-mist/35 bg-ink/30 px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-mist transition hover:border-volt hover:text-volt disabled:cursor-not-allowed disabled:opacity-50"
             >
                 Next
             </button>

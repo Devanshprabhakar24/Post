@@ -1,77 +1,136 @@
 const User = require('../models/User');
 const mongoose = require('mongoose');
+const { getRedisClient } = require('../utils/redisCache');
 
 let ioInstance = null;
-const onlineUsers = new Map();
+const localConnectionCount = new Map();
+let flushTimer = null;
 
-function getOnlineUserIds() {
-    return Array.from(onlineUsers.keys()).map((value) => Number(value));
+const ONLINE_USERS_KEY = 'online:users';
+const DIRTY_USERS_KEY = 'presence:dirty-users';
+const PRESENCE_FLUSH_INTERVAL_MS = 60 * 1000;
+
+async function getOnlineUserIds() {
+    const redis = getRedisClient();
+    try {
+        const members = await redis.smembers(ONLINE_USERS_KEY);
+        return members
+            .map((value) => Number(value))
+            .filter((value) => Number.isFinite(value) && value > 0);
+    } catch (_error) {
+        return Array.from(localConnectionCount.entries())
+            .filter(([, count]) => Number(count) > 0)
+            .map(([key]) => Number(key));
+    }
 }
 
-async function setPresence(userId, isOnline) {
+async function persistPresenceBatch() {
     if (mongoose.connection.readyState !== 1) {
         return;
     }
 
+    const redis = getRedisClient();
+
+    let dirtyUserIds = [];
     try {
-        await User.updateOne(
-            { userId },
-            {
+        dirtyUserIds = await redis.smembers(DIRTY_USERS_KEY);
+    } catch (_error) {
+        return;
+    }
+
+    const userIds = dirtyUserIds
+        .map((value) => Number(value))
+        .filter((value) => Number.isFinite(value) && value > 0);
+
+    if (!userIds.length) {
+        return;
+    }
+
+    let onlineSet = new Set();
+    try {
+        const onlineMembers = await redis.smembers(ONLINE_USERS_KEY);
+        onlineSet = new Set(
+            onlineMembers
+                .map((value) => Number(value))
+                .filter((value) => Number.isFinite(value) && value > 0)
+        );
+    } catch (_error) {
+        onlineSet = new Set();
+    }
+
+    const now = new Date();
+    const operations = userIds.map((userId) => ({
+        updateOne: {
+            filter: { userId },
+            update: {
                 $set: {
-                    isOnline,
-                    onlineAt: isOnline ? new Date() : null
+                    isOnline: onlineSet.has(userId),
+                    onlineAt: onlineSet.has(userId) ? now : null
                 }
             }
-        );
-    } catch (error) {
-        const message = String(error?.message || '').toLowerCase();
-        const isDisconnectError =
-            error?.name === 'MongoNotConnectedError' ||
-            message.includes('client must be connected') ||
-            message.includes('topology is closed') ||
-            message.includes('connection') && message.includes('closed');
-
-        if (!isDisconnectError) {
-            throw error;
         }
-    }
+    }));
+
+    await User.bulkWrite(operations, { ordered: false });
+    await redis.srem(DIRTY_USERS_KEY, ...userIds.map(String));
 }
 
 async function markOnline(userId) {
     const key = String(userId);
-    const entry = onlineUsers.get(key) || new Set();
-    const wasOffline = entry.size === 0;
-    entry.add(userId);
-    onlineUsers.set(key, entry);
+    const currentCount = Number(localConnectionCount.get(key) || 0);
+    localConnectionCount.set(key, currentCount + 1);
 
-    if (wasOffline) {
-        await setPresence(userId, true);
-        ioInstance?.emit('userOnline', { userId, onlineUsers: getOnlineUserIds() });
+    if (currentCount > 0) {
+        return;
     }
+
+    const redis = getRedisClient();
+    await redis.sadd(ONLINE_USERS_KEY, key);
+    await redis.sadd(DIRTY_USERS_KEY, key);
+
+    ioInstance?.emit('userOnline', {
+        userId,
+        onlineUsers: await getOnlineUserIds()
+    });
 }
 
 async function markOffline(userId) {
     const key = String(userId);
-    const entry = onlineUsers.get(key);
-    if (!entry) {
+    const currentCount = Number(localConnectionCount.get(key) || 0);
+
+    if (currentCount <= 1) {
+        localConnectionCount.delete(key);
+
+        const redis = getRedisClient();
+        await redis.srem(ONLINE_USERS_KEY, key);
+        await redis.sadd(DIRTY_USERS_KEY, key);
+
+        ioInstance?.emit('userOffline', {
+            userId,
+            onlineUsers: await getOnlineUserIds()
+        });
         return;
     }
 
-    entry.delete(userId);
-    if (entry.size > 0) {
-        onlineUsers.set(key, entry);
-        return;
-    }
-
-    onlineUsers.delete(key);
-    await setPresence(userId, false);
-    ioInstance?.emit('userOffline', { userId, onlineUsers: getOnlineUserIds() });
+    localConnectionCount.set(key, currentCount - 1);
 }
 
-function attachPresenceSocket(io) {
-    ioInstance = io;
+function attachPresenceSocket(namespace) {
+    ioInstance = namespace;
 
-    io.on('connection', (socket) => {
+    if (!flushTimer) {
+        flushTimer = setInterval(() => {
+            persistPresenceBatch().catch(() => {
+                // Keep interval alive if persistence fails.
+            });
+        }, PRESENCE_FLUSH_INTERVAL_MS);
+
+        if (typeof flushTimer.unref === 'function') {
+            flushTimer.unref();
+        }
+    }
+
+    namespace.on('connection', (socket) => {
         socket.on('identify', async (payload = {}) => {
             const userId = Number(payload.userId || socket.handshake.query.userId);
 
@@ -82,21 +141,24 @@ function attachPresenceSocket(io) {
             socket.data.userId = userId;
             socket.join(String(userId));
             socket.join(`user:${userId}`);
+
             try {
                 await markOnline(userId);
             } catch (_error) {
-                // Presence writes are best-effort; failures should not crash socket flow.
+                // Presence writes are best-effort.
             }
         });
 
         socket.on('disconnect', async () => {
             const userId = Number(socket.data.userId);
-            if (Number.isFinite(userId) && userId > 0) {
-                try {
-                    await markOffline(userId);
-                } catch (_error) {
-                    // Ignore disconnect-time persistence failures during shutdown.
-                }
+            if (!Number.isFinite(userId) || userId < 1) {
+                return;
+            }
+
+            try {
+                await markOffline(userId);
+            } catch (_error) {
+                // Ignore disconnect-time persistence failures.
             }
         });
     });
@@ -104,5 +166,6 @@ function attachPresenceSocket(io) {
 
 module.exports = {
     attachPresenceSocket,
-    getOnlineUserIds
+    getOnlineUserIds,
+    persistPresenceBatch
 };

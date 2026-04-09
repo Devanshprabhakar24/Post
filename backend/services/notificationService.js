@@ -3,6 +3,10 @@ const { emitNotification } = require('../sockets/notificationSocket');
 
 const DUPLICATE_WINDOW_MS = 30 * 1000;
 
+function buildDedupeKey(recipientId, senderId, postId, type) {
+    return [recipientId, senderId, postId || 'none', type].join(':');
+}
+
 function buildTargetUrl(type, senderId, postId) {
     if (Number.isFinite(Number(postId)) && Number(postId) > 0) {
         return `/posts/${Number(postId)}`;
@@ -38,24 +42,35 @@ async function createNotification({ recipientId, senderId, postId = null, type, 
         return null;
     }
 
-    const duplicateSince = new Date(Date.now() - DUPLICATE_WINDOW_MS);
-    const duplicate = await Notification.findOne({
-        recipientId: normalizedRecipientId,
-        senderId: normalizedSenderId,
-        postId: normalizedPostId,
-        type: normalizedType,
-        message: normalizedMessage,
-        createdAt: { $gte: duplicateSince }
-    }).lean();
+    const dedupeKey = buildDedupeKey(
+        normalizedRecipientId,
+        normalizedSenderId,
+        normalizedPostId,
+        normalizedType
+    );
+    const expiresAt = new Date(Date.now() + DUPLICATE_WINDOW_MS);
 
-    const record = duplicate || (await Notification.create({
-        recipientId: normalizedRecipientId,
-        senderId: normalizedSenderId,
-        postId: normalizedPostId,
-        type: normalizedType,
-        message: normalizedMessage,
-        isRead: false
-    })).toObject();
+    let created = null;
+    try {
+        created = await Notification.create({
+            recipientId: normalizedRecipientId,
+            senderId: normalizedSenderId,
+            postId: normalizedPostId,
+            type: normalizedType,
+            message: normalizedMessage,
+            isRead: false,
+            dedupeKey,
+            expiresAt
+        });
+    } catch (error) {
+        if (Number(error?.code) !== 11000) {
+            throw error;
+        }
+
+        return null;
+    }
+
+    const record = created.toObject();
 
     const payload = {
         ...record,

@@ -2,6 +2,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import Cursor from './components/Cursor';
 import ErrorBoundary from './components/ErrorBoundary';
 import LeftSidebar from './components/LeftSidebar';
 import Loader from './components/Loader';
@@ -10,6 +11,7 @@ import NotificationPanel from './components/NotificationPanel';
 import RightPanel from './components/RightPanel';
 import { useAuth } from './context/AuthContext';
 import { useSocketContext } from './context/SocketContext';
+import { contentRise, contentStagger, pageTransition, pageVariants } from './lib/motion';
 
 const Home = lazy(() => import('./pages/Home'));
 const Explore = lazy(() => import('./pages/Explore'));
@@ -27,29 +29,26 @@ function getStoredTheme() {
     if (stored === 'light' || stored === 'dark') {
         return stored;
     }
-
     return 'dark';
 }
 
-const pageTransition = {
-    initial: { opacity: 0, y: 16 },
-    animate: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: -12 }
-};
-
 function AnimatedRoute({ children }) {
-    const prefersReducedMotion = useReducedMotion();
+    const reduced = useReducedMotion();
 
     return (
         <motion.div
-            variants={pageTransition}
+            variants={pageVariants}
             initial="initial"
             animate="animate"
             exit="exit"
-            transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="min-h-[calc(100vh-72px)]"
+            transition={reduced ? { duration: 0 } : pageTransition}
+            className="min-h-[calc(100vh-80px)]"
         >
-            {children}
+            <motion.div variants={contentStagger} initial="hidden" animate="show" className="min-h-[calc(100vh-80px)]">
+                <motion.div variants={contentRise} transition={reduced ? { duration: 0 } : { duration: 0.55 }}>
+                    {children}
+                </motion.div>
+            </motion.div>
         </motion.div>
     );
 }
@@ -87,7 +86,7 @@ function AppShell({ pageProps, theme, setTheme, query, setQuery, searching, sear
                 unreadCount={unreadCount}
                 users={users}
                 onlineUsers={onlineUsers}
-                onOpenNotifications={() => setNotificationOpen((prev) => !prev)}
+                onOpenNotifications={() => setNotificationOpen((previous) => !previous)}
                 onLogout={() => {
                     logout();
                     toast.success('Logged out');
@@ -99,7 +98,7 @@ function AppShell({ pageProps, theme, setTheme, query, setQuery, searching, sear
             <main
                 id="main-content"
                 aria-label="Main content"
-                className="mx-auto grid w-full max-w-[1520px] grid-cols-1 gap-5 px-4 pb-12 pt-6 sm:px-6 lg:grid-cols-[240px_minmax(0,700px)_320px] lg:justify-center lg:gap-7 lg:px-8"
+                className="mx-auto grid w-full max-w-[1600px] grid-cols-1 gap-5 px-4 pb-14 pt-6 lg:grid-cols-[260px_minmax(0,860px)_320px]"
             >
                 <LeftSidebar
                     onOpenNotifications={() => setNotificationOpen(true)}
@@ -108,8 +107,8 @@ function AppShell({ pageProps, theme, setTheme, query, setQuery, searching, sear
                     theme={theme}
                 />
 
-                <section className="min-h-[calc(100vh-88px)] min-w-0">
-                    <Suspense fallback={<Loader count={8} />}>
+                <section className="min-h-[calc(100vh-92px)] min-w-0">
+                    <Suspense fallback={<Loader count={7} />}>
                         <AnimatePresence mode="wait">
                             <Routes>
                                 <Route
@@ -202,7 +201,7 @@ function AppShell({ pageProps, theme, setTheme, query, setQuery, searching, sear
 
 function AuthLayout() {
     return (
-        <main className="mx-auto flex min-h-[calc(100vh-72px)] w-full max-w-7xl items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
+        <main className="mx-auto flex min-h-screen w-full max-w-[1400px] items-center justify-center px-4 py-8">
             <Suspense fallback={<Loader count={1} />}>
                 <AnimatePresence mode="wait">
                     <Routes>
@@ -245,8 +244,7 @@ export default function App() {
 
     useEffect(() => {
         localStorage.setItem(THEME_KEY, theme);
-        const root = document.documentElement;
-        root.classList.toggle('dark', theme === 'dark');
+        document.documentElement.classList.toggle('dark', theme === 'dark');
     }, [theme]);
 
     useEffect(() => {
@@ -283,36 +281,30 @@ export default function App() {
 
     return (
         <ErrorBoundary>
-            <div className="min-h-screen bg-transparent text-slate-900 dark:text-slate-100">
-            <a
-                href="#main-content"
-                className="sr-only z-[100] rounded-md bg-blue-600 px-4 py-2 text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
-            >
-                Skip to main content
-            </a>
+            <Cursor />
+            <div className="min-h-screen bg-transparent text-paper">
+                <a
+                    href="#main-content"
+                    className="sr-only z-[100] rounded bg-volt px-4 py-2 text-ink focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+                >
+                    Skip to main content
+                </a>
 
-            <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-                <div className="ambient-grid absolute inset-0 opacity-45 dark:opacity-70" />
-                <div className="absolute -left-24 top-20 h-72 w-72 rounded-full bg-cyan-500/14 blur-3xl dark:bg-cyan-500/20" />
-                <div className="absolute right-0 top-1/3 h-96 w-96 rounded-full bg-emerald-500/12 blur-3xl dark:bg-emerald-500/20" />
-                <div className="absolute left-1/3 top-2/3 h-80 w-80 rounded-full bg-sky-500/8 blur-3xl dark:bg-sky-500/10" />
-            </div>
-
-            {isAuthRoute ? (
-                <AuthLayout />
-            ) : (
-                <AppShell
-                    pageProps={pageProps}
-                    query={query}
-                    setQuery={setQuery}
-                    searching={searching}
-                    searchInputRef={searchInputRef}
-                    users={users}
-                    panelPosts={panelPosts}
-                    theme={theme}
-                    setTheme={setTheme}
-                />
-            )}
+                {isAuthRoute || !isAuthenticated ? (
+                    <AuthLayout />
+                ) : (
+                    <AppShell
+                        pageProps={pageProps}
+                        query={query}
+                        setQuery={setQuery}
+                        searching={searching}
+                        searchInputRef={searchInputRef}
+                        users={users}
+                        panelPosts={panelPosts}
+                        theme={theme}
+                        setTheme={setTheme}
+                    />
+                )}
             </div>
         </ErrorBoundary>
     );

@@ -1,42 +1,80 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { Heart } from 'lucide-react';
-import { memo } from 'react';
+import { memo, useMemo, useState } from 'react';
+import useMagnet from '../hooks/useMagnet';
+import ParticleHeart from './ParticleHeart';
+import SlotCounter from './SlotCounter';
 
 function LikeButton({ isLiked, likes, onToggle, disabled = false }) {
-    const prefersReducedMotion = useReducedMotion();
+    const reduced = useReducedMotion();
+    const [burstKey, setBurstKey] = useState(0);
+    const magnet = useMagnet();
+
+    const label = useMemo(
+        () => (isLiked ? `Unlike post, ${likes} likes` : `Like post, ${likes} likes`),
+        [isLiked, likes]
+    );
+
+    const onClick = () => {
+        if (disabled) {
+            return;
+        }
+
+        if (!isLiked) {
+            setBurstKey((current) => current + 1);
+        }
+
+        onToggle?.();
+    };
 
     return (
         <motion.button
+            ref={magnet.ref}
+            style={magnet.style}
+            onMouseMove={magnet.onMouseMove}
+            onMouseLeave={magnet.onMouseLeave}
             type="button"
-            onClick={onToggle}
+            onClick={onClick}
             disabled={disabled}
+            aria-label={label}
             aria-pressed={isLiked}
-            aria-label={isLiked ? `Unlike post, ${likes} likes` : `Like post, ${likes} likes`}
-            whileTap={{ scale: 0.9 }}
-            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+            whileTap={reduced ? undefined : { scale: 0.94 }}
+            className={`magnetic-hit relative inline-flex items-center gap-2 rounded-full border px-3 py-1.5 ui-font text-xs tracking-wide transition ${
                 isLiked
-                    ? 'border-rose-400/70 bg-rose-500/15 text-rose-700 dark:bg-rose-500/20 dark:text-rose-200'
-                    : 'border-slate-300 bg-white/90 text-slate-700 hover:border-cyan-500/60 hover:text-cyan-700 dark:border-slate-600 dark:bg-slate-800/70 dark:text-slate-200 dark:hover:border-cyan-400/70 dark:hover:text-cyan-200'
-            } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+                    ? 'border-volt/80 bg-volt/20 text-paper'
+                    : 'border-mist/45 bg-transparent text-mist hover:border-volt/60 hover:text-paper'
+            } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
         >
-            <motion.span
-                key={isLiked ? 'liked' : 'idle'}
-                initial={{ scale: 0.8, opacity: 0.6 }}
-                animate={prefersReducedMotion ? { scale: 1, opacity: 1 } : { scale: [1, 1.3, 1], opacity: 1 }}
-                transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.22, ease: 'easeOut' }}
-                className="relative text-sm"
-            >
-                <Heart className={`h-4 w-4 ${isLiked ? 'fill-current text-rose-600 dark:text-rose-300' : 'text-slate-500 dark:text-slate-300'}`} />
-                {isLiked && (
+            <span className="relative inline-flex h-5 w-5 items-center justify-center">
+                <motion.span
+                    key={isLiked ? 'liked' : 'idle'}
+                    initial={reduced ? { scale: 1 } : { scale: 0.6 }}
+                    animate={
+                        reduced
+                            ? { scale: 1 }
+                            : isLiked
+                                ? { scale: [0.6, 1.4, 1], rotate: [-12, 8, 0] }
+                                : { scale: [0.8, 1], rotate: [0, 0] }
+                    }
+                    transition={reduced ? { duration: 0 } : { duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+                    className="relative z-20"
+                >
+                    <Heart className={`h-4.5 w-4.5 ${isLiked ? 'fill-current text-volt' : 'text-mist'}`} />
+                </motion.span>
+
+                {isLiked && !reduced && (
                     <motion.span
-                        initial={{ scale: 0.2, opacity: 0.5 }}
-                        animate={prefersReducedMotion ? { scale: 1, opacity: 0 } : { scale: 1.8, opacity: 0 }}
-                        transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.35 }}
-                        className="absolute inset-0 rounded-full border border-rose-300"
+                        initial={{ scale: 0.2, opacity: 0.9 }}
+                        animate={{ scale: 1.9, opacity: 0 }}
+                        transition={{ duration: 0.45, ease: 'easeOut' }}
+                        className="absolute inset-0 rounded-full border border-volt"
                     />
                 )}
-            </motion.span>
-            <span>{likes}</span>
+
+                <ParticleHeart burstKey={burstKey} />
+            </span>
+
+            <SlotCounter value={Number(likes) || 0} className="min-w-[1.5rem] text-right" />
         </motion.button>
     );
 }

@@ -58,10 +58,6 @@ const postSchema = new mongoose.Schema(
             default: 0,
             index: true
         },
-        likedBy: {
-            type: [Number],
-            default: []
-        },
         isExternal: {
             type: Boolean,
             default: true,
@@ -79,5 +75,9 @@ postSchema.index({ title: 'text', body: 'text' });
 postSchema.index({ userId: 1, createdAt: -1 });
 postSchema.index({ isExternal: 1, createdAt: -1 });
 postSchema.index({ hashtags: 1, createdAt: -1 });
+postSchema.index({ createdAt: -1 });
+postSchema.index({ likes: -1, createdAt: -1 });
+postSchema.index({ userId: 1, likes: -1, createdAt: -1 });
+postSchema.index({ hashtags: 1, likes: -1 });
 
 module.exports = mongoose.model('Post', postSchema);

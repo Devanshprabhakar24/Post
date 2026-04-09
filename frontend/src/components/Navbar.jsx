@@ -1,10 +1,29 @@
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
+import { Bell, LogOut, Moon, PanelLeft, Sun } from 'lucide-react';
 import { useMemo } from 'react';
-import { Bell, Command, LogOut, Moon, PanelLeft, Search, Sun } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import useMagnet from '../hooks/useMagnet';
 import SearchBar from './SearchBar';
 import { Avatar } from './ui/avatar';
-import { Button } from './ui/button';
+
+function MagneticIconButton({ children, onClick, label }) {
+    const magnet = useMagnet();
+
+    return (
+        <motion.button
+            ref={magnet.ref}
+            style={magnet.style}
+            onMouseMove={magnet.onMouseMove}
+            onMouseLeave={magnet.onMouseLeave}
+            type="button"
+            onClick={onClick}
+            aria-label={label}
+            className="magnetic-hit grid h-10 w-10 place-items-center rounded-full border border-mist/35 bg-transparent text-mist transition hover:border-volt hover:text-volt"
+        >
+            {children}
+        </motion.button>
+    );
+}
 
 export default function Navbar({
     query,
@@ -24,46 +43,59 @@ export default function Navbar({
     unreadCount,
     onOpenNotifications
 }) {
+    const reduced = useReducedMotion();
+    const { scrollY } = useScroll();
     const onlineSet = useMemo(() => new Set((onlineUsers || []).map((id) => Number(id))), [onlineUsers]);
-    const uniqueUsers = useMemo(() => {
-        const seen = new Set();
-        return (users || []).filter((entry) => {
-            const userId = Number(entry.userId);
-            if (!Number.isFinite(userId) || seen.has(userId)) {
-                return false;
-            }
 
-            seen.add(userId);
-            return true;
-        });
-    }, [users]);
-    const onlineProfiles = useMemo(
-        () => uniqueUsers.filter((entry) => onlineSet.has(Number(entry.userId))).slice(0, 4),
-        [onlineSet, uniqueUsers]
-    );
+    const onlineProfiles = useMemo(() => {
+        const seen = new Set();
+        return (users || [])
+            .filter((entry) => {
+                const id = Number(entry?.userId);
+                if (!Number.isFinite(id) || seen.has(id) || !onlineSet.has(id)) {
+                    return false;
+                }
+                seen.add(id);
+                return true;
+            })
+            .slice(0, 4);
+    }, [onlineSet, users]);
+
+    const headerHeight = useTransform(scrollY, [0, 80], [72, 52]);
+    const blurOpacity = useTransform(scrollY, [0, 80], [0.08, 0.86]);
+    const logoScale = useTransform(scrollY, [0, 80], [1.2, 0.9]);
 
     return (
-        <header className="sticky top-0 z-40 border-b border-slate-200/70 bg-white/72 backdrop-blur-2xl dark:border-cyan-200/10 dark:bg-slate-950/70">
-            <div className="mx-auto flex h-[74px] w-full max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8" role="navigation" aria-label="Primary navigation">
-                <Button variant="ghost" size="icon" onClick={onToggleSidebar} className="lg:hidden" aria-label="Open filters panel">
-                    <PanelLeft className="h-5 w-5" />
-                </Button>
+        <motion.header
+            style={reduced ? undefined : { height: headerHeight }}
+            className="noise-divider sticky top-0 z-50 border-b border-transparent px-3 sm:px-5"
+        >
+            <motion.div
+                style={reduced ? undefined : { opacity: blurOpacity }}
+                className="absolute inset-0 -z-10 border-b border-volt/45 bg-ink-soft/60 backdrop-blur-[20px]"
+            />
 
-                <Link to="/" className="flex items-center gap-3">
-                    <motion.div
-                        className="relative h-10 w-10 rounded-2xl bg-gradient-to-br from-cyan-300 via-sky-400 to-emerald-400 shadow-[0_10px_30px_rgba(14,165,233,0.42)]"
-                        whileHover={{ rotate: -8, scale: 1.08 }}
-                        transition={{ type: 'spring', stiffness: 260, damping: 16 }}
-                    >
-                        <span className="absolute inset-1 rounded-xl border border-white/25" />
+            <div className="mx-auto flex h-full w-full max-w-[1550px] items-center gap-3">
+                <button
+                    type="button"
+                    onClick={onToggleSidebar}
+                    className="grid h-10 w-10 place-items-center rounded-full border border-mist/40 text-mist lg:hidden"
+                    aria-label="Open sidebar"
+                >
+                    <PanelLeft className="h-4.5 w-4.5" />
+                </button>
+
+                <Link to="/" className="shrink-0">
+                    <motion.div style={reduced ? undefined : { scale: logoScale }} className="origin-left">
+                        <p className="font-display text-[2rem] leading-none text-paper">POST</p>
+                        <div className="mt-0.5 flex items-center gap-2">
+                            <span className="h-px w-10 bg-volt" />
+                            <p className="ui-font text-[10px] tracking-[0.26em] text-mist">EXPLORER</p>
+                        </div>
                     </motion.div>
-                    <div className="leading-tight">
-                        <p className="text-[10px] uppercase tracking-[0.24em] text-cyan-700/90 dark:text-cyan-200/80">Realtime Social Graph</p>
-                        <h1 className="text-[1.03rem] font-semibold text-slate-900 dark:text-white">Post Explorer</h1>
-                    </div>
                 </Link>
 
-                <div className="hidden flex-1 lg:block">
+                <div className="ml-1 hidden flex-1 lg:block">
                     <SearchBar
                         value={query}
                         onChange={onQueryChange}
@@ -75,93 +107,63 @@ export default function Navbar({
                     />
                 </div>
 
-                <div className="ml-auto flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
-                    {isAuthenticated && (
-                        <div className="hidden items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/12 px-2.5 py-1 lg:inline-flex dark:border-emerald-400/25 dark:bg-emerald-500/10">
-                            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-200">
-                                {onlineSet.size} online
-                            </span>
-                            <div className="ml-1 flex items-center">
-                                {onlineProfiles.length > 0 ? (
-                                    onlineProfiles.map((profile, index) => (
-                                        <div
-                                            key={profile.userId}
-                                            className={index === 0 ? '' : '-ml-2'}
-                                            title={profile.name || profile.username || `User ${profile.userId}`}
-                                        >
-                                            <Avatar
-                                                name={profile.name || profile.username}
-                                                online
-                                                className="h-7 w-7 border-white dark:border-slate-950"
-                                            />
-                                        </div>
-                                    ))
-                                ) : (
-                                    <span className="text-xs text-emerald-700/80 dark:text-emerald-200/70">No active users</span>
-                                )}
+                <div className="ml-auto flex items-center gap-2">
+                    <div className="hidden items-center pr-1 sm:flex">
+                        {onlineProfiles.map((entry, index) => (
+                            <div key={entry.userId} className={index > 0 ? '-ml-2' : ''}>
+                                <Avatar
+                                    name={entry.name || entry.username}
+                                    src={entry.profilePic || entry.imageUrl || ''}
+                                    online
+                                    className="h-8 w-8 border border-volt/55"
+                                />
                             </div>
-                        </div>
-                    )}
-
-                    <div className="hidden items-center gap-1 rounded-full border border-slate-300/70 bg-white/70 px-2 py-1 text-xs text-slate-600 lg:inline-flex dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
-                        <Command className="h-3.5 w-3.5" /> /
+                        ))}
                     </div>
 
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={onToggleTheme}
-                        aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-                    >
-                        {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                    </Button>
+                    <div className="relative">
+                        <MagneticIconButton onClick={onOpenNotifications} label="Open notifications">
+                            <Bell className="h-4.5 w-4.5" />
+                        </MagneticIconButton>
+                        {unreadCount > 0 && (
+                            <span className="live-dot pointer-events-none absolute -right-1 -top-1 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-ember px-1 ui-font text-[10px] text-ink">
+                                {Math.min(99, unreadCount)}
+                            </span>
+                        )}
+                    </div>
 
-                    <Button variant="ghost" size="icon" aria-label="Open notifications" onClick={onOpenNotifications}>
-                        <motion.span
-                            key={unreadCount > 0 ? `shake-${unreadCount}` : 'idle'}
-                            initial={{ rotate: 0 }}
-                            animate={unreadCount > 0 ? { rotate: [0, -12, 9, -6, 3, 0] } : { rotate: 0 }}
-                            transition={{ duration: 0.56, ease: [0.22, 1, 0.36, 1] }}
-                            className="relative inline-flex"
-                        >
-                            <Bell className="h-4 w-4" />
-                            {unreadCount > 0 && (
-                                <span className="absolute -right-1.5 -top-1.5 inline-flex min-h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
-                                    {Math.min(99, unreadCount)}
-                                </span>
-                            )}
-                        </motion.span>
-                    </Button>
+                    <MagneticIconButton
+                        onClick={onToggleTheme}
+                        label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                    >
+                        {theme === 'dark' ? <Sun className="h-4.5 w-4.5" /> : <Moon className="h-4.5 w-4.5" />}
+                    </MagneticIconButton>
 
                     {isAuthenticated && (
-                        <Link to="/profile" className="hidden sm:inline-flex">
-                            <Button variant="ghost" size="sm" className="inline-flex items-center gap-2">
-                                <Avatar name={user?.name} src={user?.profilePic || user?.imageUrl || user?.profilePicData || ''} className="h-6 w-6" />
-                                <span>{user?.name?.split(' ')[0] || 'Profile'}</span>
-                            </Button>
+                        <Link to="/profile" className="hidden sm:block">
+                            <Avatar
+                                name={user?.name}
+                                src={user?.profilePic || user?.imageUrl || user?.profilePicData || ''}
+                                className="h-9 w-9 border border-volt/40"
+                            />
                         </Link>
                     )}
 
                     {isAdmin && (
-                        <Link to="/admin" className="hidden sm:inline-flex">
-                            <Button variant="ghost" size="sm">Admin</Button>
+                        <Link to="/admin" className="hidden rounded-full border border-mist/35 px-3 py-1.5 ui-font text-[11px] uppercase tracking-[0.14em] text-mist hover:border-volt hover:text-volt sm:inline-flex">
+                            Admin
                         </Link>
                     )}
 
-                    {isAuthenticated ? (
-                        <Button variant="ghost" size="icon" onClick={onLogout} aria-label="Logout">
-                            <LogOut className="h-4 w-4" />
-                        </Button>
-                    ) : (
-                        <Link to="/login" className="inline-flex">
-                            <Button variant="ghost" size="sm">Login</Button>
-                        </Link>
+                    {isAuthenticated && (
+                        <MagneticIconButton onClick={onLogout} label="Log out">
+                            <LogOut className="h-4.5 w-4.5" />
+                        </MagneticIconButton>
                     )}
                 </div>
             </div>
 
-            <div className="mx-auto w-full max-w-7xl px-4 pb-3 sm:px-6 lg:hidden lg:px-8">
+            <div className="mx-auto mt-2 w-full max-w-[1550px] pb-3 lg:hidden">
                 <SearchBar
                     value={query}
                     onChange={onQueryChange}
@@ -170,10 +172,7 @@ export default function Navbar({
                     inputRef={searchInputRef}
                     inputId="global-post-search-mobile"
                 />
-                <div className="mt-1 inline-flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
-                    <Search className="h-3.5 w-3.5" /> Press <span className="rounded bg-slate-300/55 px-1 dark:bg-white/10">/</span> to focus search
-                </div>
             </div>
-        </header>
+        </motion.header>
     );
 }

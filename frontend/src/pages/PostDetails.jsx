@@ -2,13 +2,22 @@ import { motion } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import CommentThread from '../components/CommentThread';
 import LikeButton from '../components/LikeButton';
 import Loader from '../components/Loader';
+import ReadingProgress from '../components/ReadingProgress';
 import ReplyForm from '../components/ReplyForm';
-import CommentThread from '../components/CommentThread';
 import { Avatar } from '../components/ui/avatar';
 import { useAuth } from '../context/AuthContext';
-import { createPostComment, fetchPostById, fetchPostComments, getLikeStatus, likePost, replyToComment, unlikePost } from '../services/api';
+import {
+    createPostComment,
+    fetchPostById,
+    fetchPostComments,
+    getLikeStatus,
+    likePost,
+    replyToComment,
+    unlikePost
+} from '../services/api';
 import { joinPost, onLikeUpdated } from '../services/socket';
 
 export default function PostDetails() {
@@ -25,7 +34,9 @@ export default function PostDetails() {
     const [error, setError] = useState('');
 
     const commentCount = useMemo(() => {
-        const walk = (items) => (Array.isArray(items) ? items.reduce((total, item) => total + 1 + walk(item.replies), 0) : 0);
+        const walk = (items) => (Array.isArray(items)
+            ? items.reduce((total, item) => total + 1 + walk(item.replies), 0)
+            : 0);
         return walk(comments);
     }, [comments]);
 
@@ -37,10 +48,7 @@ export default function PostDetails() {
             setError('');
 
             try {
-                const [postData, thread] = await Promise.all([
-                    fetchPostById(id),
-                    fetchPostComments(id)
-                ]);
+                const [postData, thread] = await Promise.all([fetchPostById(id), fetchPostComments(id)]);
                 const likeStatus = await getLikeStatus(id, currentUserId).catch(() => null);
 
                 if (!active) {
@@ -54,7 +62,6 @@ export default function PostDetails() {
                     isLiked: Boolean(likeStatus?.isLiked)
                 });
                 setComments(Array.isArray(thread) ? thread : []);
-
                 joinPost(Number(id));
             } catch (requestError) {
                 if (active) {
@@ -87,7 +94,6 @@ export default function PostDetails() {
                 }
 
                 const likedBy = Array.isArray(payload.likedBy) ? payload.likedBy : [];
-
                 return {
                     ...current,
                     likes: Number(payload.totalLikes) || 0,
@@ -121,7 +127,6 @@ export default function PostDetails() {
             } else {
                 await unlikePost(post.postId, user?.userId);
             }
-
             toast.success(shouldLike ? 'Post liked' : 'Post unliked');
         } catch (requestError) {
             setPost(snapshot);
@@ -149,19 +154,19 @@ export default function PostDetails() {
     };
 
     if (loading) {
-        return <Loader count={4} />;
+        return <Loader count={3} />;
     }
 
     if (error) {
         return (
-            <div className="glass-card p-8 text-center">
-                <p className="text-lg font-semibold text-rose-300">{error}</p>
+            <div className="rounded-2xl border border-ember/45 bg-ember/10 p-6 text-center">
+                <p className="font-body text-lg italic text-ember">{error}</p>
                 <button
                     type="button"
                     onClick={() => navigate('/')}
-                    className="mt-5 rounded-lg bg-slate-800 px-4 py-2 text-sm text-white hover:bg-slate-700"
+                    className="mt-4 rounded-full border border-mist/40 px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-mist"
                 >
-                    Back to Home
+                    Back to feed
                 </button>
             </div>
         );
@@ -173,91 +178,49 @@ export default function PostDetails() {
 
     return (
         <>
-            <motion.article
-                initial={{ opacity: 0, y: 22 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.35 }}
-                className="glass-card mx-auto max-w-4xl space-y-8 p-6 sm:p-8"
-            >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <Link to="/" className="text-sm text-cyan-300 transition hover:text-cyan-200">
-                        ← Back to feed
-                    </Link>
-                    <LikeButton
-                        isLiked={Boolean(post.isLiked)}
-                        likes={Number(post.likes) || 0}
-                        onToggle={handleLikeToggle}
-                        disabled={updatingLike}
-                    />
-                </div>
-
-                <div>
-                    <h2 className="text-2xl font-semibold text-white sm:text-3xl">{post.title}</h2>
-                    <p className="mt-5 whitespace-pre-line text-base leading-8 text-slate-300">{post.body}</p>
-                    {post.imageUrl && (
-                        <img src={post.imageUrl} alt={post.title} className="mt-5 max-h-[30rem] w-full rounded-2xl object-cover" />
-                    )}
-                    {Array.isArray(post.hashtags) && post.hashtags.length > 0 && (
-                        <div className="mt-4 flex flex-wrap gap-2">
-                            {post.hashtags.map((tag) => (
-                                <span
-                                    key={tag}
-                                    className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-200"
-                                >
-                                    #{tag}
-                                </span>
-                            ))}
+            <ReadingProgress />
+            <motion.article initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="mx-auto max-w-5xl space-y-8">
+                <header className="space-y-3">
+                    <Link to="/" className="ui-font text-xs uppercase tracking-[0.14em] text-volt">Back to feed</Link>
+                    <h1 className="font-display text-[clamp(3rem,9vw,5.4rem)] leading-[0.88] text-paper">{post.title}</h1>
+                    <div className="flex items-center justify-between gap-3 border-b border-mist/30 pb-3">
+                        <div className="inline-flex items-center gap-3">
+                            <Avatar
+                                name={post.authorName || post.author?.name}
+                                src={post.author?.profilePic || post.author?.imageUrl || ''}
+                                online={Boolean(post.author?.isOnline)}
+                                className="h-10 w-10 border border-volt/40"
+                            />
+                            <span className="ui-font text-xs uppercase tracking-[0.14em] text-mist">
+                                @{post.authorUsername || post.author?.username || `user-${post.userId}`}
+                            </span>
                         </div>
-                    )}
-                </div>
-
-                <div className="rounded-2xl border border-slate-700/50 bg-slate-900/70 p-5">
-                    <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Author</p>
-                    <div className="mt-3 flex items-center gap-3">
-                        <Avatar
-                            name={post.authorName || post.author?.name}
-                            src={post.author?.profilePic || post.author?.imageUrl || ''}
-                            online={Boolean(post.author?.isOnline)}
-                            className="h-12 w-12"
-                        />
-                        <div>
-                            {(post.authorName || post.author?.name) && (
-                                <h3 className="text-lg font-semibold text-white">{post.authorName || post.author?.name}</h3>
-                            )}
-                            {(post.authorEmail || post.author?.email || post.authorUsername || post.author?.username) && (
-                                <p className="text-sm text-slate-300">
-                                    {post.authorEmail || post.author?.email || post.authorUsername || post.author?.username}
-                                </p>
-                            )}
-                            {(post.authorUsername || post.author?.username) && (
-                                <p className="text-sm text-slate-400">@{post.authorUsername || post.author?.username}</p>
-                            )}
-                        </div>
+                        <LikeButton isLiked={Boolean(post.isLiked)} likes={Number(post.likes) || 0} onToggle={handleLikeToggle} disabled={updatingLike} />
                     </div>
-                </div>
+                </header>
 
-                <section>
-                    <div className="mb-4 flex items-center justify-between gap-3">
-                        <h4 className="text-xl font-semibold text-white">Comments ({commentCount})</h4>
-                    </div>
+                <section className="mx-auto max-w-[680px]">
+                    <p className="whitespace-pre-line font-body text-xl leading-9 text-paper">{post.body}</p>
+                    {post.imageUrl && <img src={post.imageUrl} alt={post.title} className="mt-6 max-h-[38rem] w-full rounded-2xl object-cover" />}
+                </section>
 
-                    <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4">
-                        <h5 className="text-sm font-semibold text-white">Add a comment</h5>
-                        <div className="mt-3">
-                            <ReplyForm placeholder="Share your thoughts..." submitLabel="Post comment" onSubmit={handleAddComment} />
-                        </div>
+                <section className="space-y-4">
+                    <h2 className="font-display text-5xl text-paper">Comments ({commentCount})</h2>
+
+                    <div className="rounded-2xl border border-mist/35 p-4">
+                        <ReplyForm placeholder="Share your thoughts..." submitLabel="Post comment" onSubmit={handleAddComment} />
                     </div>
 
                     {loadingComments ? (
                         <Loader count={2} />
                     ) : (
-                        <div className="space-y-4">
-                            {comments.map((comment) => (
+                        <div className="space-y-3">
+                            {comments.map((comment, index) => (
                                 <motion.div
                                     key={comment.commentId}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ duration: 0.25 }}
+                                    initial={{ opacity: 0, x: -22 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ duration: 0.35, delay: index * 0.04 }}
                                 >
                                     <CommentThread comment={comment} onReply={handleReply} />
                                 </motion.div>
@@ -266,7 +229,6 @@ export default function PostDetails() {
                     )}
                 </section>
             </motion.article>
-
         </>
     );
 }

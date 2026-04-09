@@ -1,8 +1,9 @@
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Eye, EyeOff } from 'lucide-react';
+import useMagnet from '../hooks/useMagnet';
 import { useAuth } from '../context/AuthContext';
 import {
     PASSWORD_RULES,
@@ -15,36 +16,23 @@ import {
 
 export default function Register() {
     const navigate = useNavigate();
+    const reduced = useReducedMotion();
+    const magnet = useMagnet();
     const { isAuthenticated, register } = useAuth();
+
     const [form, setForm] = useState({ name: '', email: '', password: '', otp: '' });
     const [loading, setLoading] = useState(false);
     const [showOtp, setShowOtp] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [emailError, setEmailError] = useState('');
     const [otpError, setOtpError] = useState('');
+
     const passwordState = useMemo(() => validatePassword(form.password), [form.password]);
     const passwordScore = Object.values(passwordState.checks).filter(Boolean).length;
-    const passwordProgress = (passwordScore / PASSWORD_RULES.length) * 100;
 
     if (isAuthenticated) {
         return <Navigate to="/" replace />;
     }
-
-    const handleEmailChange = (value) => {
-        setForm((previous) => ({ ...previous, email: value }));
-
-        if (!value) {
-            setEmailError('');
-            return;
-        }
-
-        if (!isValidEmail(value)) {
-            setEmailError('Enter a valid email address');
-            return;
-        }
-
-        setEmailError('');
-    };
 
     const onSubmit = async (event) => {
         event.preventDefault();
@@ -53,11 +41,12 @@ export default function Register() {
             toast.error('Name is required');
             return;
         }
+
         if (!isValidEmail(form.email)) {
             setEmailError('Enter a valid email address');
-            toast.error('Enter a valid email address');
             return;
         }
+
         if (isEmailVerified(form.email)) {
             toast.error('This email can only be used once in the test flow');
             return;
@@ -76,12 +65,10 @@ export default function Register() {
 
         if (!validateTestOtp(form.otp)) {
             setOtpError('OTP must be 123456');
-            toast.error('OTP must be 123456');
             return;
         }
 
         setLoading(true);
-
         try {
             markEmailVerified(form.email);
             await register(form);
@@ -95,122 +82,110 @@ export default function Register() {
     };
 
     return (
-        <motion.section
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mx-auto mt-12 w-full max-w-md rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur-xl"
-        >
-            <h1 className="text-2xl font-semibold text-white">Create account</h1>
-            <p className="mt-1 text-sm text-slate-300">Join to create posts and realtime interactions.</p>
+        <section className="grid min-h-[85vh] w-full max-w-6xl overflow-hidden rounded-3xl border border-mist/35 lg:grid-cols-2">
+            <div className="relative hidden overflow-hidden bg-ink lg:block">
+                <div className="absolute inset-0 animate-[hue-rotate_10s_linear_infinite] bg-[radial-gradient(circle_at_20%_20%,rgba(200,241,53,0.22),transparent_44%),radial-gradient(circle_at_70%_70%,rgba(255,107,53,0.24),transparent_48%),radial-gradient(circle_at_50%_45%,rgba(245,240,232,0.08),transparent_55%)]" />
+                <p className="absolute left-6 top-1/2 -translate-y-1/2 font-display text-8xl leading-none tracking-[0.08em] text-paper [writing-mode:vertical-rl]">
+                    POST EXPLORER
+                </p>
+            </div>
 
-            <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-                <div>
-                    <label htmlFor="name" className="mb-1 block text-sm text-slate-300">Name</label>
+            <motion.form
+                initial={reduced ? { opacity: 1 } : { opacity: 0, x: 30 }}
+                animate={{ opacity: 1, x: 0 }}
+                onSubmit={onSubmit}
+                className="flex flex-col justify-center gap-3 bg-paper px-6 py-10"
+            >
+                <h1 className="font-display text-6xl leading-none text-ink">REGISTER</h1>
+                <p className="font-body text-lg italic text-mist">Build your profile for the live feed.</p>
+
+                <label className="space-y-1">
+                    <span className="ui-font text-[10px] uppercase tracking-[0.18em] text-mist">Name</span>
                     <input
-                        id="name"
-                        required
                         value={form.name}
                         onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                        className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-white outline-none focus:border-cyan-400"
+                        className="w-full rounded-xl border border-mist/35 bg-transparent px-3 py-2 font-ui text-sm uppercase tracking-[0.06em] text-paper focus:border-volt focus:outline-none"
                     />
-                </div>
-                <div>
-                    <label htmlFor="email" className="mb-1 block text-sm text-slate-300">Email</label>
+                </label>
+
+                <label className="space-y-1">
+                    <span className="ui-font text-[10px] uppercase tracking-[0.18em] text-mist">Email</span>
                     <input
-                        id="email"
                         type="email"
-                        required
                         value={form.email}
-                        onChange={(event) => handleEmailChange(event.target.value)}
-                        className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-white outline-none focus:border-cyan-400"
+                        onChange={(event) => {
+                            const value = event.target.value;
+                            setForm((prev) => ({ ...prev, email: value }));
+                            setEmailError(isValidEmail(value) ? '' : 'Enter a valid email address');
+                        }}
+                        className="w-full rounded-xl border border-mist/35 bg-transparent px-3 py-2 font-ui text-sm uppercase tracking-[0.06em] text-paper focus:border-volt focus:outline-none"
                     />
-                    {emailError && <p className="mt-1 text-xs text-rose-300">{emailError}</p>}
-                </div>
-                <div>
-                    <label htmlFor="password" className="mb-1 block text-sm text-slate-300">Password</label>
+                    {emailError && <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-ember">{emailError}</p>}
+                </label>
+
+                <label className="space-y-1">
+                    <span className="ui-font text-[10px] uppercase tracking-[0.18em] text-mist">Password</span>
                     <div className="relative">
                         <input
-                            id="password"
                             type={showPassword ? 'text' : 'password'}
-                            required
-                            minLength={8}
-                            autoComplete="new-password"
-                            autoCapitalize="none"
-                            spellCheck={false}
                             value={form.password}
                             onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-                            className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 pr-11 text-white outline-none focus:border-cyan-400"
+                            className="w-full rounded-xl border border-mist/35 bg-transparent px-3 py-2 pr-10 font-ui text-sm uppercase tracking-[0.06em] text-paper focus:border-volt focus:outline-none"
                         />
                         <button
                             type="button"
-                            onClick={() => setShowPassword((previous) => !previous)}
-                            className="absolute inset-y-0 right-0 inline-flex items-center justify-center px-3 text-slate-400 transition hover:text-white"
-                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            onClick={() => setShowPassword((prev) => !prev)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-mist"
                         >
                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                     </div>
-                    <div className="mt-3">
-                        <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                            <div
-                                className={`h-full rounded-full transition-all ${
-                                    passwordScore < 3 ? 'bg-rose-400' : passwordScore < 5 ? 'bg-amber-400' : 'bg-emerald-400'
-                                }`}
-                                style={{ width: `${passwordProgress}%` }}
-                            />
-                        </div>
-                        <div className="mt-2 flex items-center justify-between text-[11px] text-slate-400">
-                            <span>Password strength</span>
-                            <span>{passwordScore}/{PASSWORD_RULES.length}</span>
-                        </div>
+                </label>
+
+                <div className="rounded-xl border border-mist/30 p-3">
+                    <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-mist/20">
+                        <span className="block h-full bg-volt" style={{ width: `${(passwordScore / PASSWORD_RULES.length) * 100}%` }} />
                     </div>
-                    <div className="mt-2 space-y-1 rounded-xl border border-white/10 bg-slate-950/60 p-3 text-xs text-slate-300">
-                        <p className="font-medium text-slate-200">Password requirements</p>
+                    <div className="grid gap-1">
                         {PASSWORD_RULES.map((rule) => (
-                            <div key={rule.key} className={`flex items-center gap-2 ${passwordState.checks[rule.key] ? 'text-emerald-300' : ''}`}>
-                                <span>{passwordState.checks[rule.key] ? '✓' : '•'}</span>
-                                <span>{rule.label}</span>
-                            </div>
+                            <p key={rule.key} className={`ui-font text-[10px] uppercase tracking-[0.14em] ${passwordState.checks[rule.key] ? 'text-volt' : 'text-mist'}`}>
+                                {passwordState.checks[rule.key] ? '✓' : '•'} {rule.label}
+                            </p>
                         ))}
                     </div>
                 </div>
 
                 {showOtp && (
-                    <div>
-                        <label htmlFor="otp" className="mb-1 block text-sm text-slate-300">OTP</label>
+                    <label className="space-y-1">
+                        <span className="ui-font text-[10px] uppercase tracking-[0.18em] text-mist">OTP</span>
                         <input
-                            id="otp"
-                            inputMode="numeric"
-                            maxLength={6}
-                            required
                             value={form.otp}
                             onChange={(event) => {
-                                setForm((previous) => ({ ...previous, otp: event.target.value }));
-                                if (otpError) {
-                                    setOtpError('');
-                                }
+                                setForm((prev) => ({ ...prev, otp: event.target.value }));
+                                setOtpError('');
                             }}
-                            placeholder="123456"
-                            className="w-full rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-white outline-none focus:border-cyan-400"
+                            className="w-full rounded-xl border border-mist/35 bg-transparent px-3 py-2 font-ui text-sm uppercase tracking-[0.06em] text-paper focus:border-volt focus:outline-none"
                         />
-                        <p className="mt-1 text-xs text-slate-400">Test OTP: 123456</p>
-                        {otpError && <p className="mt-1 text-xs text-rose-300">{otpError}</p>}
-                    </div>
+                        {otpError && <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-ember">{otpError}</p>}
+                    </label>
                 )}
 
-                <button
+                <motion.button
+                    ref={magnet.ref}
+                    style={magnet.style}
+                    onMouseMove={magnet.onMouseMove}
+                    onMouseLeave={magnet.onMouseLeave}
                     type="submit"
                     disabled={loading}
-                    className="w-full rounded-xl bg-gradient-to-r from-cyan-400 to-teal-500 px-4 py-2 font-medium text-slate-950 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="magnetic-hit mt-2 rounded-full border border-volt/80 bg-volt px-5 py-3 ui-font text-xs uppercase tracking-[0.16em] text-ink disabled:opacity-60"
                 >
-                    {loading ? 'Creating account...' : showOtp ? 'Verify & Register' : 'Register'}
-                </button>
-            </form>
+                    {loading ? 'Creating...' : showOtp ? 'Verify & Register' : 'Continue'}
+                </motion.button>
 
-            <p className="mt-4 text-sm text-slate-300">
-                Already have an account?{' '}
-                <Link to="/login" className="text-cyan-300 hover:text-cyan-200">Login</Link>
-            </p>
-        </motion.section>
+                <p className="ui-font text-xs uppercase tracking-[0.12em] text-mist">
+                    Already have an account? <Link to="/login" className="text-volt">Login</Link>
+                </p>
+            </motion.form>
+        </section>
     );
 }

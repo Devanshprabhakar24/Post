@@ -1,7 +1,7 @@
 let ioInstance = null;
 
-function attachPostSocket(io) {
-    ioInstance = io;
+function attachPostSocket(namespace) {
+    ioInstance = namespace;
 }
 
 function emitNewPost(payload) {

@@ -4,7 +4,7 @@ const multer = require('multer');
  * Centralized error handler middleware
  */
 function errorHandler(err, req, res, next) {
-    console.error('Error:', err);
+    console.error(`[${req?.requestId || 'n/a'}] Error:`, err);
 
     if (err instanceof multer.MulterError) {
         const message = err.code === 'LIMIT_FILE_SIZE'
@@ -15,6 +15,7 @@ function errorHandler(err, req, res, next) {
             success: false,
             data: null,
             message,
+            requestId: req.requestId,
             error: process.env.NODE_ENV === 'development' ? err : undefined
         });
     }
@@ -27,6 +28,7 @@ function errorHandler(err, req, res, next) {
         success: false,
         data: null,
         message,
+        requestId: req.requestId,
         error: process.env.NODE_ENV === 'development' ? err : undefined
     });
 }
@@ -38,7 +40,8 @@ function notFoundHandler(req, res) {
     return res.status(404).json({
         success: false,
         data: null,
-        message: `Route not found: ${req.method} ${req.originalUrl}`
+        message: `Route not found: ${req.method} ${req.originalUrl}`,
+        requestId: req.requestId
     });
 }
 

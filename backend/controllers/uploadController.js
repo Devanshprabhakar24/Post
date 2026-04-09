@@ -1,4 +1,4 @@
-const { uploadBufferToCloudinary } = require('../services/cloudinaryUploadService');
+const { processUpload } = require('../jobs/uploadQueue');
 
 async function uploadImage(req, res) {
     try {
@@ -6,8 +6,9 @@ async function uploadImage(req, res) {
             return res.status(400).json({ success: false, message: 'Image file is required' });
         }
 
-        const result = await uploadBufferToCloudinary(req.file.buffer, {
+        const result = await processUpload(req.file.buffer, {
             folder: 'post_images',
+            mimetype: req.file.mimetype,
             transformation: [
                 {
                     width: 800,
@@ -24,7 +25,8 @@ async function uploadImage(req, res) {
                 imageUrl: result.secure_url,
                 publicId: result.public_id,
                 width: result.width,
-                height: result.height
+                height: result.height,
+                storage: result.storage || 'cloudinary'
             },
             message: 'Image uploaded successfully'
         });

@@ -6,6 +6,7 @@ import EmptyState from '../components/EmptyState';
 import Loader from '../components/Loader';
 import PostModal from '../components/PostModal';
 import PostCard from '../components/PostCard';
+import TextReveal from '../components/TextReveal';
 import { useAuth } from '../context/AuthContext';
 import { useSocketContext } from '../context/SocketContext';
 import useDebounce from '../hooks/useDebounce';
@@ -24,14 +25,11 @@ const PAGE_SIZE = 12;
 
 function dedupePosts(list) {
     const seen = new Set();
-
     return (Array.isArray(list) ? list : []).filter((post) => {
         const postId = Number(post?.postId);
-
         if (!Number.isFinite(postId) || seen.has(postId)) {
             return false;
         }
-
         seen.add(postId);
         return true;
     });
@@ -58,9 +56,9 @@ function sanitizePost(post, currentUserId, userMap, commentsMap, isUserOnline) {
         isLiked: likedBy.includes(currentUserId),
         author: author
             ? {
-                  ...author,
-                  isOnline: typeof isUserOnline === 'function' ? Boolean(isUserOnline(post?.userId) || author?.isOnline) : Boolean(author?.isOnline)
-              }
+                ...author,
+                isOnline: typeof isUserOnline === 'function' ? Boolean(isUserOnline(post?.userId) || author?.isOnline) : Boolean(author?.isOnline)
+            }
             : author,
         authorName: post?.author?.name || authorProfile.name || '',
         authorEmail: post?.author?.email || authorProfile.email || '',
@@ -98,7 +96,6 @@ function applySocketLike(list, payload, currentUserId) {
         }
 
         const likedBy = Array.isArray(payload.likedBy) ? payload.likedBy : [];
-
         return {
             ...item,
             likedBy,
@@ -107,16 +104,6 @@ function applySocketLike(list, payload, currentUserId) {
         };
     });
 }
-
-const listVariants = {
-    hidden: { opacity: 0 },
-    show: {
-        opacity: 1,
-        transition: {
-            staggerChildren: 0.05
-        }
-    }
-};
 
 export default function Home({
     query,
@@ -131,9 +118,9 @@ export default function Home({
     setPanelPosts
 }) {
     const navigate = useNavigate();
-    const prefersReducedMotion = useReducedMotion();
+    const reduced = useReducedMotion();
     const { user, isAdmin } = useAuth();
-    const { isUserOnline } = useSocketContext();
+    const { isUserOnline, onlineUsers } = useSocketContext();
     const currentUserId = String(user?.userId || '');
     const sentinelRef = useRef(null);
     const commentsCacheRef = useRef({});
@@ -150,12 +137,14 @@ export default function Home({
     const [error, setError] = useState('');
     const [likingIds, setLikingIds] = useState(new Set());
     const [previewPost, setPreviewPost] = useState(null);
+    const [modalOrigin, setModalOrigin] = useState({ x: '50%', y: '50%' });
     const [composerOpen, setComposerOpen] = useState(false);
     const [composer, setComposer] = useState({ title: '', body: '' });
     const [creatingPost, setCreatingPost] = useState(false);
     const [selectedHashtag, setSelectedHashtag] = useState('');
     const [composerImageFile, setComposerImageFile] = useState(null);
     const [composerImagePreview, setComposerImagePreview] = useState('');
+    const [livePulseIds, setLivePulseIds] = useState({});
 
     const debouncedQuery = useDebounce(query, 300);
 
@@ -172,19 +161,18 @@ export default function Home({
     }, [posts]);
 
     const userMap = useMemo(
-        () =>
-            users.reduce((acc, user) => {
-                acc[user.userId] = {
-                    name: user.name,
-                    email: user.email,
-                    username: user.username,
-                    imageUrl: user.imageUrl,
-                    profilePic: user.profilePic,
-                    bio: user.bio,
-                    isOnline: user.isOnline
-                };
-                return acc;
-            }, {}),
+        () => users.reduce((acc, item) => {
+            acc[item.userId] = {
+                name: item.name,
+                email: item.email,
+                username: item.username,
+                imageUrl: item.imageUrl,
+                profilePic: item.profilePic,
+                bio: item.bio,
+                isOnline: item.isOnline
+            };
+            return acc;
+        }, {}),
         [users]
     );
 
@@ -195,7 +183,7 @@ export default function Home({
 
         const cache = commentsCacheRef.current;
         const missing = incomingPosts
-            .map((post) => post.postId)
+            .map((item) => item.postId)
             .filter((postId) => typeof cache[postId] !== 'number');
 
         if (!missing.length) {
@@ -203,12 +191,12 @@ export default function Home({
         }
 
         const pairs = missing.map((postId) => {
-            const matched = incomingPosts.find((post) => post.postId === postId);
+            const matched = incomingPosts.find((entry) => entry.postId === postId);
             return [postId, Number(matched?.commentsCount) || 0];
         });
 
-        setCommentCounts((previous) => {
-            const next = { ...previous };
+        setCommentCounts((prev) => {
+            const next = { ...prev };
             pairs.forEach(([postId, count]) => {
                 next[postId] = count;
             });
@@ -216,77 +204,73 @@ export default function Home({
         });
     }, []);
 
-    const loadPosts = useCallback(
-        async (targetPage = 1, append = false, signal) => {
+    const loadPosts = useCallback(async (targetPage = 1, append = false, signal) => {
+        if (append) {
+            setIsLoadingMore(true);
+        } else {
+            setLoading(true);
+        }
+        setError('');
+
+        try {
+            const params = {
+                page: targetPage,
+                limit: PAGE_SIZE,
+                sort: 'desc',
+                sortBy: 'createdAt'
+            };
+
+            if (selectedUser) {
+                params.userId = selectedUser;
+            }
+
+            if (selectedHashtag) {
+                params.hashtag = selectedHashtag;
+            }
+
+            let response = await fetchPosts(params, { signal });
+
+            if (targetPage === 1 && response.posts.length === 0) {
+                await syncPosts();
+                response = await fetchPosts(params, { signal });
+            }
+
+            let nextPosts = [];
+            setPosts((current) => {
+                nextPosts = dedupePosts(targetPage === 1 ? response.posts : [...current, ...response.posts]);
+                return nextPosts;
+            });
+
+            setTotalPages(response?.pagination?.pages || 1);
+            setHasMore(targetPage < (response?.pagination?.pages || 1));
+            await hydrateCommentsCount(nextPosts);
+        } catch (requestError) {
+            const isCanceled =
+                requestError?.name === 'CanceledError' ||
+                requestError?.name === 'AbortError' ||
+                requestError?.code === 'ERR_CANCELED';
+
+            if (!isCanceled) {
+                const shouldShowBlockingError = !append && targetPage === 1 && postsCacheRef.current.length === 0;
+                if (shouldShowBlockingError) {
+                    setError(requestError.message || 'Failed to load posts');
+                }
+            }
+        } finally {
             if (append) {
-                setIsLoadingMore(true);
+                setIsLoadingMore(false);
             } else {
-                setLoading(true);
+                setLoading(false);
             }
-            setError('');
-
-            try {
-                const params = {
-                    page: targetPage,
-                    limit: PAGE_SIZE,
-                    sort: 'desc',
-                    sortBy: 'createdAt'
-                };
-
-                if (selectedUser) {
-                    params.userId = selectedUser;
-                }
-
-                if (selectedHashtag) {
-                    params.hashtag = selectedHashtag;
-                }
-
-                let response = await fetchPosts(params, { signal });
-
-                if (targetPage === 1 && response.posts.length === 0) {
-                    await syncPosts();
-                    response = await fetchPosts(params, { signal });
-                }
-
-                let nextPosts = [];
-                setPosts((current) => {
-                    nextPosts = dedupePosts(targetPage === 1 ? response.posts : [...current, ...response.posts]);
-                    return nextPosts;
-                });
-                setTotalPages(response?.pagination?.pages || 1);
-                setHasMore(targetPage < (response?.pagination?.pages || 1));
-                await hydrateCommentsCount(nextPosts);
-            } catch (requestError) {
-                const isCanceled =
-                    requestError?.name === 'CanceledError' ||
-                    requestError?.name === 'AbortError' ||
-                    requestError?.code === 'ERR_CANCELED';
-
-                if (!isCanceled) {
-                    const shouldShowBlockingError = !append && targetPage === 1 && postsCacheRef.current.length === 0;
-                    if (shouldShowBlockingError) {
-                        setError(requestError.message || 'Failed to load posts');
-                    }
-                }
-            } finally {
-                if (append) {
-                    setIsLoadingMore(false);
-                } else {
-                    setLoading(false);
-                }
-            }
-        },
-        [selectedHashtag, selectedUser, hydrateCommentsCount]
-    );
+        }
+    }, [hydrateCommentsCount, selectedHashtag, selectedUser]);
 
     useEffect(() => {
         const controller = new AbortController();
 
         fetchUsers({ signal: controller.signal })
             .then(setUsers)
-            .catch(() => {
-                setUsers([]);
-            });
+            .catch(() => setUsers([]));
 
         return () => controller.abort();
     }, [setUsers]);
@@ -298,7 +282,9 @@ export default function Home({
     }, [selectedHashtag, selectedUser, sortMode]);
 
     useEffect(() => {
-        if (!debouncedQuery.trim()) {
+        const normalizedQuery = debouncedQuery.trim();
+
+        if (!normalizedQuery || normalizedQuery.length < 3) {
             setPage(1);
             setSearchResults([]);
             setSearching(false);
@@ -308,7 +294,7 @@ export default function Home({
         }
 
         setSearching(true);
-        emitSearch(debouncedQuery, 300);
+        emitSearch(normalizedQuery, 300);
     }, [debouncedQuery, loadPosts, setSearching]);
 
     useEffect(() => {
@@ -321,25 +307,22 @@ export default function Home({
             return;
         }
 
-        const observer = new IntersectionObserver(
-            async (entries) => {
-                const target = entries[0];
-                if (!target.isIntersecting) {
-                    return;
-                }
+        const observer = new IntersectionObserver(async (entries) => {
+            const target = entries[0];
+            if (!target.isIntersecting) {
+                return;
+            }
 
-                if (page >= totalPages) {
-                    setHasMore(false);
-                    return;
-                }
+            if (page >= totalPages) {
+                setHasMore(false);
+                return;
+            }
 
-                const nextPage = page + 1;
-                setPage(nextPage);
-                const controller = new AbortController();
-                await loadPosts(nextPage, true, controller.signal);
-            },
-            { threshold: 0.2 }
-        );
+            const nextPage = page + 1;
+            setPage(nextPage);
+            const controller = new AbortController();
+            await loadPosts(nextPage, true, controller.signal);
+        }, { threshold: 0.2 });
 
         observer.observe(sentinel);
         return () => observer.disconnect();
@@ -360,6 +343,15 @@ export default function Home({
 
             setPosts((current) => applySocketLike(current, payload, currentUserId));
             setSearchResults((current) => applySocketLike(current, payload, currentUserId));
+
+            setLivePulseIds((current) => ({ ...current, [payload.postId]: Date.now() }));
+            window.setTimeout(() => {
+                setLivePulseIds((current) => {
+                    const next = { ...current };
+                    delete next[payload.postId];
+                    return next;
+                });
+            }, 2000);
         });
 
         const stopNewPost = onNewPost((payload) => {
@@ -368,7 +360,7 @@ export default function Home({
             }
 
             const matchesUser = !selectedUser || String(payload.userId) === String(selectedUser);
-            const matchesTag = !selectedHashtag || Array.isArray(payload.hashtags) && payload.hashtags.includes(selectedHashtag);
+            const matchesTag = !selectedHashtag || (Array.isArray(payload.hashtags) && payload.hashtags.includes(selectedHashtag));
 
             if (!matchesUser || !matchesTag) {
                 return;
@@ -382,7 +374,7 @@ export default function Home({
             stopLikeUpdated();
             stopNewPost();
         };
-    }, [currentUserId, debouncedQuery, selectedHashtag, selectedUser, hydrateCommentsCount]);
+    }, [currentUserId, debouncedQuery, hydrateCommentsCount, selectedHashtag, selectedUser, setSearching]);
 
     const visiblePosts = useMemo(() => {
         const base = debouncedQuery.trim() ? searchResults : posts;
@@ -392,7 +384,6 @@ export default function Home({
             if (sortMode === 'liked') {
                 return (Number(b.likes) || 0) - (Number(a.likes) || 0);
             }
-
             return Number(b.postId) - Number(a.postId);
         });
 
@@ -471,8 +462,8 @@ export default function Home({
             setComposerImagePreview('');
             setComposerOpen(false);
             toast.success('Post created');
-        } catch (error) {
-            toast.error(error.message || 'Failed to create post');
+        } catch (requestError) {
+            toast.error(requestError.message || 'Failed to create post');
         } finally {
             setCreatingPost(false);
         }
@@ -484,12 +475,20 @@ export default function Home({
             setPosts((current) => current.filter((entry) => entry.postId !== post.postId));
             setSearchResults((current) => current.filter((entry) => entry.postId !== post.postId));
             toast.success('Post deleted');
-        } catch (error) {
-            toast.error(error.message || 'Failed to delete post');
+        } catch (requestError) {
+            toast.error(requestError.message || 'Failed to delete post');
         }
     };
 
-    const handleOpenPreview = useCallback((post) => {
+    const handleOpenPreview = useCallback((post, event) => {
+        if (event?.clientX && event?.clientY) {
+            const x = `${(event.clientX / window.innerWidth) * 100}%`;
+            const y = `${(event.clientY / window.innerHeight) * 100}%`;
+            setModalOrigin({ x, y });
+        } else {
+            setModalOrigin({ x: '50%', y: '50%' });
+        }
+
         setPreviewPost(post);
     }, []);
 
@@ -515,37 +514,50 @@ export default function Home({
     }, [composerImagePreview]);
 
     return (
-        <section className="space-y-6">
-            <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white/72 p-6 shadow-[0_22px_48px_rgba(15,23,42,0.14)] backdrop-blur-xl dark:border-cyan-200/10 dark:bg-slate-900/55 dark:shadow-[0_24px_60px_rgba(2,6,23,0.4)]">
-                <div className="pointer-events-none absolute -right-8 -top-8 h-36 w-36 rounded-full bg-cyan-400/20 blur-2xl" />
-                <div className="pointer-events-none absolute -left-8 bottom-0 h-32 w-32 rounded-full bg-emerald-400/15 blur-2xl" />
-                <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                        <h2 className="title-display text-3xl font-semibold text-slate-900 dark:text-slate-100 sm:text-4xl">Realtime Social Feed</h2>
-                        <p className="mt-2 max-w-xl text-sm text-slate-600 dark:text-slate-300">Live presence, instant post delivery, threaded discussions, and hashtag-powered discovery in one cinematic feed.</p>
+        <section className="space-y-6 pb-6">
+            <header className="noise-divider editorial-surface rounded-3xl p-6">
+                <TextReveal
+                    text="WHAT'S HAPPENING"
+                    className="font-display text-[clamp(3.2rem,11vw,6rem)] leading-[0.86] text-paper"
+                />
+                <div className="mt-3 h-[2px] w-36 bg-volt" />
+
+                <div className="mt-5 grid gap-2 rounded-2xl border border-mist/30 p-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-mist/25 px-3 py-2">
+                        <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-mist">Total posts</p>
+                        <p className="font-display text-4xl leading-none text-paper">{visiblePosts.length}</p>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => setSortMode((previous) => (previous === 'liked' ? 'latest' : 'liked'))}
-                            className="rounded-xl border border-slate-300/80 bg-white/80 px-4 py-2 text-sm text-slate-800 transition hover:border-cyan-300/50 hover:bg-cyan-500/10 dark:border-white/15 dark:bg-white/5 dark:text-slate-100 dark:hover:border-cyan-300/40"
-                        >
-                            {sortMode === 'liked' ? 'Sorting: Most liked' : 'Sorting: Latest'}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setComposerOpen(true)}
-                            className="rounded-xl bg-gradient-to-r from-cyan-300 via-sky-400 to-emerald-400 px-4 py-2 text-sm font-semibold text-slate-950 shadow-[0_12px_30px_rgba(14,165,233,0.35)] transition hover:brightness-110"
-                        >
-                            Create Post
-                        </button>
+                    <div className="rounded-xl border border-mist/25 px-3 py-2">
+                        <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-mist">Online users</p>
+                        <p className="font-display text-4xl leading-none text-paper">{onlineUsers?.length || 0}</p>
+                    </div>
+                    <div className="rounded-xl border border-mist/25 px-3 py-2">
+                        <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-mist">New today</p>
+                        <p className="font-display text-4xl leading-none text-paper">{posts.filter((item) => new Date(item.createdAt || 0).toDateString() === new Date().toDateString()).length}</p>
                     </div>
                 </div>
-            </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setSortMode((prev) => (prev === 'liked' ? 'latest' : 'liked'))}
+                        className="rounded-full border border-mist/40 px-3 py-1 ui-font text-[11px] uppercase tracking-[0.14em] text-mist hover:border-volt hover:text-volt"
+                    >
+                        {sortMode === 'liked' ? 'Most liked' : 'Latest'}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setComposerOpen(true)}
+                        className="rounded-full border border-volt/70 bg-volt px-4 py-1 ui-font text-[11px] uppercase tracking-[0.14em] text-ink hover:bg-volt-dim"
+                    >
+                        Create post
+                    </button>
+                </div>
+            </header>
 
             {selectedHashtag && (
-                <div className="flex items-center gap-2 text-sm text-cyan-700 dark:text-cyan-200">
-                    <span className="rounded-full border border-cyan-400/40 bg-cyan-500/12 px-3 py-1 dark:border-cyan-400/30 dark:bg-cyan-500/10">#{selectedHashtag}</span>
+                <div className="inline-flex items-center gap-2 rounded-full border border-volt/50 px-3 py-1 ui-font text-xs uppercase tracking-[0.14em] text-volt">
+                    #{selectedHashtag}
                     <button
                         type="button"
                         onClick={() => {
@@ -554,22 +566,18 @@ export default function Home({
                                 navigate('/explore');
                             }
                         }}
-                        className="text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                        className="text-mist hover:text-paper"
                     >
-                        Clear tag
+                        Clear
                     </button>
                 </div>
             )}
 
             <p className="sr-only" aria-live="polite">
-                {searching
-                    ? 'Searching posts'
-                    : `Showing ${visiblePosts.length} ${visiblePosts.length === 1 ? 'post' : 'posts'}`}
+                {searching ? 'Searching posts' : `Showing ${visiblePosts.length} ${visiblePosts.length === 1 ? 'post' : 'posts'}`}
             </p>
 
-            {error && (
-                <div className="glass-card border-rose-500/30 bg-rose-900/20 p-4 text-sm text-rose-200">{error}</div>
-            )}
+            {error && <div className="rounded-2xl border border-ember/45 bg-ember/10 p-4 font-ui text-sm text-ember">{error}</div>}
 
             {loading ? (
                 <Loader count={8} />
@@ -577,41 +585,39 @@ export default function Home({
                 <EmptyState />
             ) : (
                 <motion.div
-                    layout
-                    variants={listVariants}
-                    initial="hidden"
-                    animate="show"
-                    transition={prefersReducedMotion ? { duration: 0 } : undefined}
-                    className="space-y-3"
+                    className="columns-1 gap-4 space-y-0 md:columns-2"
+                    initial={reduced ? { opacity: 1 } : { opacity: 0 }}
+                    animate={{ opacity: 1 }}
                 >
                     <AnimatePresence>
-                        {visiblePosts.map((post) => (
-                            <div key={post.postId} className="[content-visibility:auto] [contain-intrinsic-size:360px]">
-                                <PostCard
-                                    post={post}
-                                    query={debouncedQuery}
-                                    onToggleLike={handleLikeToggle}
-                                    isLiking={likingIds.has(post.postId)}
-                                    onOpenPreview={handleOpenPreview}
-                                    onOpenDetails={() => handleOpenDetails(post.postId)}
-                                    canDelete={isAdmin || String(post.userId) === String(user?.userId)}
-                                    isOwnPost={String(post.userId) === String(user?.userId)}
-                                    onDelete={handleDeletePost}
-                                    onTagClick={(tag) => navigate(`/hashtags/${String(tag || '').toLowerCase()}`)}
-                                />
-                            </div>
+                        {visiblePosts.map((post, index) => (
+                            <PostCard
+                                key={post.postId}
+                                index={index}
+                                post={post}
+                                query={debouncedQuery}
+                                onToggleLike={handleLikeToggle}
+                                isLiking={likingIds.has(post.postId)}
+                                onOpenPreview={handleOpenPreview}
+                                onOpenDetails={() => handleOpenDetails(post.postId)}
+                                canDelete={isAdmin || String(post.userId) === String(user?.userId)}
+                                isOwnPost={String(post.userId) === String(user?.userId)}
+                                onDelete={handleDeletePost}
+                                onTagClick={(tag) => navigate(`/hashtags/${String(tag || '').toLowerCase()}`)}
+                                isLive={Boolean(livePulseIds[post.postId])}
+                            />
                         ))}
                     </AnimatePresence>
                 </motion.div>
             )}
 
-            {!debouncedQuery.trim() && <div ref={sentinelRef} id="feed-sentinel" className="h-8 w-full" aria-hidden="true" />}
-
+            {!debouncedQuery.trim() && <div ref={sentinelRef} className="h-8 w-full" aria-hidden="true" />}
             {!debouncedQuery.trim() && isLoadingMore && <Loader count={2} />}
 
             <PostModal
                 open={Boolean(previewPost)}
                 post={previewPost}
+                origin={modalOrigin}
                 onClose={() => setPreviewPost(null)}
                 onToggleLike={handleLikeToggle}
                 liking={previewPost ? likingIds.has(previewPost.postId) : false}
@@ -622,90 +628,57 @@ export default function Home({
                     <>
                         <motion.button
                             type="button"
-                            aria-label="Close post composer"
                             onClick={() => setComposerOpen(false)}
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            className="fixed inset-0 z-50 bg-black/60"
+                            className="fixed inset-0 z-[90] bg-black/70"
+                            aria-label="Close composer"
                         />
 
                         <motion.form
-                            initial={{ opacity: 0, scale: 0.96, y: 16 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.96, y: 10 }}
-                            transition={{ duration: 0.2 }}
                             onSubmit={handleCreatePost}
-                            className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto p-4 sm:p-6"
+                            initial={reduced ? { opacity: 1 } : { opacity: 0, y: 24, scale: 0.96 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={reduced ? { opacity: 1 } : { opacity: 0, y: 12, scale: 0.97 }}
+                            className="fixed inset-0 z-[92] grid place-items-center p-4"
                         >
-                            <div className="w-full max-w-2xl max-h-[calc(100vh-2rem)] overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/96 p-5 shadow-2xl backdrop-blur-xl dark:border-white/15 dark:bg-slate-900/95 sm:max-h-[calc(100vh-3rem)]">
-                                <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Create post</h3>
-                                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Share something with the realtime community.</p>
+                            <div className="editorial-surface w-full max-w-2xl rounded-3xl p-5">
+                                <h3 className="font-display text-5xl text-paper">Create Story</h3>
+                                <p className="font-body italic text-mist">Publish something worth clipping.</p>
 
                                 <div className="mt-4 space-y-3">
                                     <input
                                         value={composer.title}
                                         onChange={(event) => setComposer((prev) => ({ ...prev, title: event.target.value }))}
-                                        placeholder="Post title"
-                                        className="w-full rounded-xl border border-slate-300/80 bg-white/85 px-3 py-2 text-slate-900 outline-none transition focus:border-cyan-400 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                                        placeholder="Headline"
+                                        className="w-full rounded-xl border border-mist/35 bg-transparent px-3 py-3 font-display text-3xl text-paper focus:border-volt focus:outline-none"
                                     />
                                     <textarea
                                         value={composer.body}
                                         onChange={(event) => setComposer((prev) => ({ ...prev, body: event.target.value }))}
-                                        placeholder="Post body"
+                                        placeholder="Write the post body"
                                         rows={6}
-                                        className="w-full rounded-xl border border-slate-300/80 bg-white/85 px-3 py-2 text-slate-900 outline-none transition focus:border-cyan-400 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                                        className="w-full rounded-xl border border-mist/35 bg-transparent px-3 py-3 font-body text-lg italic text-paper focus:border-volt focus:outline-none"
                                     />
 
-                                    <div className="space-y-3 rounded-xl border border-dashed border-slate-300/80 bg-slate-50/70 p-4 dark:border-white/15 dark:bg-white/5">
-                                        <div className="flex items-center justify-between gap-3">
-                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-200" htmlFor="composer-image">
-                                                Media upload
-                                            </label>
-                                            {composerImageFile && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        if (composerImagePreview) {
-                                                            URL.revokeObjectURL(composerImagePreview);
-                                                        }
-                                                        setComposerImageFile(null);
-                                                        setComposerImagePreview('');
-                                                    }}
-                                                    className="text-xs font-semibold text-rose-600 transition hover:text-rose-500 dark:text-rose-300 dark:hover:text-rose-200"
-                                                >
-                                                    Remove
-                                                </button>
-                                            )}
-                                        </div>
-                                        <input
-                                            id="composer-image"
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleComposerImageChange}
-                                            className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-cyan-400 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-slate-950 hover:file:brightness-110 dark:text-slate-300"
-                                        />
-                                        {composerImagePreview && (
-                                            <div className="overflow-hidden rounded-xl border border-slate-300/80 bg-slate-100/70 dark:border-white/10 dark:bg-slate-950/40">
-                                                <img src={composerImagePreview} alt="Preview" className="max-h-56 w-full object-cover" />
-                                            </div>
-                                        )}
-                                    </div>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleComposerImageChange}
+                                        className="block w-full rounded-xl border border-dashed border-mist/40 p-3 font-ui text-xs text-mist"
+                                    />
+
+                                    {composerImagePreview && (
+                                        <img src={composerImagePreview} alt="preview" className="h-56 w-full rounded-xl object-cover" />
+                                    )}
                                 </div>
 
-                                <div className="mt-5 flex items-center justify-end gap-2 border-t border-slate-300/80 pt-4 dark:border-white/10">
-                                    <button
-                                        type="button"
-                                        onClick={() => setComposerOpen(false)}
-                                        className="rounded-lg border border-slate-300/80 px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
-                                    >
+                                <div className="mt-4 flex justify-end gap-2">
+                                    <button type="button" onClick={() => setComposerOpen(false)} className="rounded-full border border-mist/35 px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-mist">
                                         Cancel
                                     </button>
-                                    <button
-                                        type="submit"
-                                        disabled={creatingPost}
-                                        className="rounded-lg bg-gradient-to-r from-cyan-400 to-teal-500 px-3 py-2 text-sm font-semibold text-slate-950 disabled:cursor-not-allowed disabled:opacity-70"
-                                    >
+                                    <button type="submit" disabled={creatingPost} className="rounded-full border border-volt/80 bg-volt px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-ink disabled:opacity-60">
                                         {creatingPost ? 'Publishing...' : 'Publish'}
                                     </button>
                                 </div>

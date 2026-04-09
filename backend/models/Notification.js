@@ -32,6 +32,14 @@ const notificationSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
             index: true
+        },
+        dedupeKey: {
+            type: String,
+            default: null
+        },
+        expiresAt: {
+            type: Date,
+            default: null
         }
     },
     {
@@ -41,5 +49,8 @@ const notificationSchema = new mongoose.Schema(
 );
 
 notificationSchema.index({ recipientId: 1, createdAt: -1 });
+notificationSchema.index({ recipientId: 1, isRead: 1, createdAt: -1 });
+notificationSchema.index({ dedupeKey: 1 }, { unique: true, sparse: true });
+notificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = mongoose.model('Notification', notificationSchema);

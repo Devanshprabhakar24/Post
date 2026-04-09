@@ -1,36 +1,33 @@
-import { motion, useReducedMotion } from 'framer-motion';
-import { memo } from 'react';
-import { ArrowUpRight, MessageCircle, Repeat2 } from 'lucide-react';
+import { motion, useInView, useReducedMotion, useScroll, useTransform } from 'framer-motion';
+import { ArrowUpRight, MessageCircle, Share2 } from 'lucide-react';
+import { memo, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import useMagnet from '../hooks/useMagnet';
+import { postCardInView } from '../lib/motion';
 import LikeButton from './LikeButton';
 import { Avatar } from './ui/avatar';
-import { Badge } from './ui/badge';
-import { Button } from './ui/button';
-import { Card, CardContent, CardFooter } from './ui/card';
 
-function highlightText(text, query) {
-    if (!query) {
-        return text;
-    }
+function MagneticTag({ tag, onClick }) {
+    const magnet = useMagnet();
 
-    const safeQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`(${safeQuery})`, 'ig');
-    const parts = String(text || '').split(regex);
-
-    return parts.map((part, index) =>
-        index % 2 === 1 ? (
-            <mark key={`${part}-${index}`} className="rounded bg-cyan-500/20 px-0.5 text-cyan-900 dark:bg-cyan-500/30 dark:text-cyan-100">
-                {part}
-            </mark>
-        ) : (
-            <span key={`${part}-${index}`}>{part}</span>
-        )
+    return (
+        <motion.button
+            ref={magnet.ref}
+            style={magnet.style}
+            onMouseMove={magnet.onMouseMove}
+            onMouseLeave={magnet.onMouseLeave}
+            onClick={() => onClick?.(tag)}
+            type="button"
+            className="magnetic-hit rounded-full border border-volt/45 px-2 py-1 ui-font text-[10px] uppercase tracking-[0.16em] text-volt hover:bg-volt hover:text-ink"
+        >
+            #{tag}
+        </motion.button>
     );
 }
 
-function formatTimeAgo(dateValue) {
-    const time = new Date(dateValue || Date.now()).getTime();
-    const diff = Date.now() - time;
+function formatTimeAgo(value) {
+    const stamp = new Date(value || Date.now()).getTime();
+    const diff = Date.now() - stamp;
     const minute = 60 * 1000;
     const hour = 60 * minute;
     const day = 24 * hour;
@@ -41,12 +38,24 @@ function formatTimeAgo(dateValue) {
     if (diff < day) {
         return `${Math.floor(diff / hour)}h`;
     }
-
     return `${Math.floor(diff / day)}d`;
+}
+
+function highlightText(text, query) {
+    if (!query) {
+        return text;
+    }
+
+    const safe = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${safe})`, 'ig');
+    return String(text || '').split(regex).map((part, index) => (
+        index % 2 === 1 ? <mark key={`${part}-${index}`} className="bg-volt/40 px-0.5 text-ink">{part}</mark> : <span key={`${part}-${index}`}>{part}</span>
+    ));
 }
 
 function PostCard({
     post,
+    index = 0,
     query,
     onToggleLike,
     isLiking = false,
@@ -55,124 +64,134 @@ function PostCard({
     canDelete = false,
     isOwnPost = false,
     onDelete,
-    onTagClick
+    onTagClick,
+    isLive = false
 }) {
-    const prefersReducedMotion = useReducedMotion();
+    const reduced = useReducedMotion();
+    const cardRef = useRef(null);
+    const imageRef = useRef(null);
+    const inView = useInView(cardRef, { once: true, margin: '-12% 0px -10% 0px' });
+
+    const { scrollYProgress } = useScroll({
+        target: imageRef,
+        offset: ['start end', 'end start']
+    });
+    const imageY = useTransform(scrollYProgress, [0, 1], ['-8%', '8%']);
+
+    const entryMotion = postCardInView(index);
+    const displayName = post?.authorName || post?.author?.name || `User ${post?.userId}`;
+    const displayHandle = post?.authorUsername || post?.author?.username || `user${post?.userId}`;
     const likes = Number(post?.likes) || 0;
-    const badgeLabel = post?.isExternal ? 'External Post' : isOwnPost ? 'Your Post' : '';
-    const displayName = post.authorName || post.author?.name || `User ${post.userId}`;
-    const displayHandle = post.authorUsername || post.author?.username || `user${post.userId}`;
-    const timestamp = formatTimeAgo(post.createdAt);
+    const hashtags = Array.isArray(post?.hashtags) ? post.hashtags : [];
+    const timestamp = formatTimeAgo(post?.createdAt);
+    const accent = useMagnet();
+
+    const cardClasses = useMemo(
+        () => `relative overflow-hidden rounded-2xl border-l border-l-volt/65 px-4 py-4 transition duration-300 editorial-surface ${isLive ? 'live-card-flash' : ''}`,
+        [isLive]
+    );
 
     return (
         <motion.article
-            layout
-            whileInView={{ opacity: [0, 1], y: [18, 0] }}
-            viewport={{ once: true, margin: '-20px' }}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-            whileHover={prefersReducedMotion ? undefined : { y: -3, boxShadow: '0 26px 54px rgba(8, 47, 73, 0.42)' }}
-            className="h-full"
+            ref={cardRef}
+            initial={entryMotion.initial}
+            whileInView={entryMotion.whileInView}
+            viewport={entryMotion.viewport}
+            transition={reduced ? { duration: 0 } : entryMotion.transition}
+            whileHover={reduced ? undefined : { y: -4, boxShadow: '0 24px 70px rgba(10, 10, 15, 0.24)' }}
+            className="mb-4 break-inside-avoid"
         >
-            <Card className="group app-surface relative h-full overflow-hidden border-slate-200/90 bg-white/90 shadow-[0_16px_36px_rgba(15,23,42,0.12)] dark:border-cyan-200/10 dark:bg-slate-900/60 dark:shadow-[0_20px_55px_rgba(2,6,23,0.42)]">
-                <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-cyan-400/12 blur-3xl transition-opacity duration-300 group-hover:opacity-100 dark:bg-cyan-400/10" />
-                <CardContent className="space-y-3.5 p-4 sm:p-5">
-                    <div className="flex items-start gap-3">
-                        <Avatar
-                            name={displayName}
-                            src={post.author?.profilePic || post.author?.imageUrl || ''}
-                            online={Boolean(post.author?.isOnline)}
-                            className="mt-0.5"
-                        />
+            <div className={cardClasses}>
+                <motion.span
+                    className="absolute left-0 top-0 h-full w-[2px] origin-top bg-volt"
+                    initial={{ scaleY: 0.4, opacity: 0.7 }}
+                    animate={{ scaleY: inView ? 1 : 0.4, opacity: 1 }}
+                    transition={{ duration: 0.5 }}
+                />
 
-                        <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2 text-sm">
-                                <p className="font-semibold text-slate-900 dark:text-white">{displayName}</p>
-                                <p className="text-slate-600 dark:text-slate-400">@{displayHandle}</p>
-                                <span className="text-slate-500 dark:text-slate-500">·</span>
-                                <time className="text-slate-500 dark:text-slate-500">{timestamp}</time>
-                                {badgeLabel && (
-                                    <Badge className="ml-auto border-cyan-400/35 bg-cyan-500/12 text-cyan-800 dark:border-cyan-300/30 dark:bg-cyan-500/10 dark:text-cyan-100">
-                                        {badgeLabel}
-                                    </Badge>
-                                )}
+                {isLive && <span className="live-dot absolute right-3 top-3 h-2 w-2 rounded-full bg-ember" />}
+
+                {post?.imageUrl && (
+                    <div ref={imageRef} className="mb-4 h-52 overflow-hidden rounded-xl border border-mist/30">
+                        <motion.img
+                            src={post.imageUrl}
+                            alt={post.title}
+                            loading="lazy"
+                            style={reduced ? undefined : { y: imageY }}
+                            className="h-[120%] w-full object-cover"
+                        />
+                    </div>
+                )}
+
+                <div className="grid gap-4 md:grid-cols-[35%_65%]">
+                    <aside className="space-y-3 border-b border-mist/20 pb-3 md:border-b-0 md:border-r md:pr-4 md:pb-0">
+                        <div className="flex items-center gap-3">
+                            <Avatar
+                                name={displayName}
+                                src={post?.author?.profilePic || post?.author?.imageUrl || ''}
+                                online={Boolean(post?.author?.isOnline)}
+                                className="h-11 w-11 border border-volt/40"
+                            />
+                            <div>
+                                <p className="font-display text-2xl uppercase leading-none text-paper">{displayName}</p>
+                                <p className="ui-font text-[10px] uppercase tracking-[0.18em] text-mist">@{displayHandle}</p>
                             </div>
-
-                            <button
-                                type="button"
-                                onClick={onOpenDetails || (() => {})}
-                                aria-label={`Open post ${post.postId} details`}
-                                className="mt-2 block w-full text-left"
-                            >
-                                <h3 className="line-clamp-2 text-[1.02rem] font-semibold leading-snug text-slate-900 transition-colors duration-200 group-hover:text-cyan-700 dark:text-white dark:group-hover:text-cyan-200">
-                                    {highlightText(post.title, query)}
-                                </h3>
-                                <p className="line-clamp-4 mt-2 text-[0.93rem] leading-relaxed text-slate-700 dark:text-slate-300">
-                                    {highlightText(post.body, query)}
-                                </p>
-                            </button>
                         </div>
-                    </div>
-
-                    {post.imageUrl && (
-                        <button type="button" onClick={onOpenDetails || (() => {})} className="block w-full overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-100/70 dark:border-cyan-200/20 dark:bg-slate-950/60">
-                            <img src={post.imageUrl} alt={post.title} loading="lazy" className="h-52 w-full object-cover transition duration-500 ease-out group-hover:scale-[1.015]" />
-                        </button>
-                    )}
-
-                    {Array.isArray(post.hashtags) && post.hashtags.length > 0 && (
+                        <time className="ui-font text-[11px] tracking-wide text-mist">{timestamp} ago</time>
                         <div className="flex flex-wrap gap-2">
-                            {post.hashtags.map((tag) => (
-                                <button
-                                    key={tag}
-                                    type="button"
-                                    onClick={() => onTagClick?.(tag)}
-                                    className="rounded-full border border-cyan-400/35 bg-cyan-500/12 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-800 transition hover:border-cyan-400/60 hover:bg-cyan-500/18 dark:border-cyan-400/20 dark:bg-cyan-500/10 dark:text-cyan-200 dark:hover:border-cyan-300/50 dark:hover:bg-cyan-500/20"
-                                >
-                                    #{tag}
-                                </button>
-                            ))}
+                            {hashtags.map((tag) => {
+                                return (
+                                    <MagneticTag key={tag} tag={tag} onClick={onTagClick} />
+                                );
+                            })}
                         </div>
-                    )}
-                </CardContent>
+                    </aside>
 
-                <CardFooter className="flex items-center justify-between border-t border-slate-200/85 p-4 pt-3.5 dark:border-white/5 sm:p-5 sm:pt-4">
-                    <div className="inline-flex items-center gap-1 text-slate-700 dark:text-slate-300">
-                        <Button variant="ghost" size="sm" onClick={onOpenDetails || (() => {})} className="rounded-full">
-                            <MessageCircle className="mr-1 h-4 w-4" /> {post.commentsCount ?? 0}
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => onOpenPreview?.(post)} className="rounded-full">
-                            <Repeat2 className="mr-1 h-4 w-4" /> Repost
-                        </Button>
-                    </div>
+                    <section className="space-y-3">
+                        <button type="button" onClick={onOpenDetails || (() => {})} className="block w-full text-left">
+                            <h3 className="font-display text-[28px] leading-[0.95] tracking-[-0.02em] text-paper">
+                                {highlightText(post?.title, query)}
+                            </h3>
+                            <p className="mt-2 line-clamp-4 font-body text-base italic leading-7 text-mist">
+                                {highlightText(post?.body, query)}
+                            </p>
+                        </button>
 
-                    <div className="flex items-center gap-2">
-                        <LikeButton
-                            likes={likes}
-                            isLiked={Boolean(post.isLiked)}
-                            onToggle={() => onToggleLike(post)}
-                            disabled={isLiking}
-                        />
-                        {canDelete && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => onDelete?.(post)}
-                                aria-label={`Delete post ${post.postId}`}
-                                className="text-rose-600 hover:text-rose-500 dark:text-rose-300 dark:hover:text-rose-200"
+                        <div className="flex items-center justify-end gap-3 border-t border-mist/25 pt-3 ui-font text-[11px] uppercase tracking-[0.12em] text-mist">
+                            <LikeButton
+                                likes={likes}
+                                isLiked={Boolean(post?.isLiked)}
+                                onToggle={() => onToggleLike(post)}
+                                disabled={isLiking}
+                            />
+                            <span className="inline-flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5" /> {post?.commentsCount ?? 0}</span>
+                            <button
+                                ref={accent.ref}
+                                style={accent.style}
+                                onMouseMove={accent.onMouseMove}
+                                onMouseLeave={accent.onMouseLeave}
+                                type="button"
+                                onClick={(event) => onOpenPreview?.(post, event)}
+                                className="magnetic-hit inline-flex items-center gap-1 rounded-full border border-mist/35 px-2 py-1 hover:border-volt hover:text-volt"
                             >
-                                Delete
-                            </Button>
-                        )}
-                        <Link to={`/posts/${post.postId}`} className="inline-flex">
-                            <Button variant="secondary" size="sm">
+                                <Share2 className="h-3.5 w-3.5" /> Share
+                            </button>
+                            {canDelete && (
+                                <button
+                                    type="button"
+                                    onClick={() => onDelete?.(post)}
+                                    className="rounded-full border border-ember/40 px-2 py-1 text-ember hover:bg-ember hover:text-ink"
+                                >
+                                    Delete
+                                </button>
+                            )}
+                            <Link to={`/posts/${post.postId}`} className="inline-flex items-center gap-1 rounded-full border border-mist/35 px-2 py-1 hover:border-volt hover:text-volt">
                                 Open <ArrowUpRight className="h-3.5 w-3.5" />
-                            </Button>
-                        </Link>
-                    </div>
-                </CardFooter>
-            </Card>
+                            </Link>
+                        </div>
+                    </section>
+                </div>
+            </div>
         </motion.article>
     );
 }

@@ -1,8 +1,10 @@
 const User = require('../models/User');
 const Post = require('../models/Post');
+const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const { createNotification } = require('../services/notificationService');
-const { uploadBufferToMedia, deleteMediaByUrl } = require('../services/cloudinaryUploadService');
+const { deleteMediaByUrl } = require('../services/cloudinaryUploadService');
+const { processUpload } = require('../jobs/uploadQueue');
 
 function getViewerUserId(req) {
     const authHeader = req.headers.authorization || '';
@@ -70,14 +72,34 @@ async function upsertUsers(users) {
  */
 async function getAllUsers(req, res) {
     try {
-        const users = await User.find()
-            .select({ _id: 0, userId: 1, name: 1, username: 1, email: 1, bio: 1, imageUrl: 1, profilePic: 1, profilePicData: 1, profilePicContentType: 1, isOnline: 1, followers: 1, following: 1, isExternal: 1, createdAt: 1 })
+        const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+        const cursor = String(req.query.cursor || '').trim();
+        const query = {};
+
+        if (cursor && mongoose.Types.ObjectId.isValid(cursor)) {
+            query._id = { $lt: cursor };
+        }
+
+        const users = await User.find(query)
+            .sort({ _id: -1 })
+            .limit(limit)
+            .select({ _id: 1, userId: 1, name: 1, username: 1, email: 1, bio: 1, imageUrl: 1, profilePic: 1, isOnline: 1, followers: 1, following: 1, isExternal: 1, createdAt: 1, profilePicData: 0, profilePicContentType: 0 })
             .lean();
+
+        const nextCursor = users.length > 0 ? String(users[users.length - 1]._id || '') : null;
+        const normalizedUsers = users.map((entry) => {
+            const { _id, ...rest } = entry;
+            return rest;
+        });
 
         return res.status(200).json({
             success: true,
-            data: users,
-            count: users.length,
+            data: normalizedUsers,
+            count: normalizedUsers.length,
+            pagination: {
+                limit,
+                cursor: nextCursor
+            },
             message: 'Users fetched successfully'
         });
     } catch (error) {
@@ -106,7 +128,7 @@ async function getUserById(req, res) {
         }
 
         const user = await User.findOne({ userId })
-            .select({ _id: 0, userId: 1, name: 1, username: 1, email: 1, bio: 1, imageUrl: 1, profilePic: 1, profilePicData: 1, profilePicContentType: 1, followers: 1, following: 1, isOnline: 1, onlineAt: 1, address: 1, phone: 1, website: 1, company: 1 })
+            .select({ _id: 0, userId: 1, name: 1, username: 1, email: 1, bio: 1, imageUrl: 1, profilePic: 1, followers: 1, following: 1, isOnline: 1, onlineAt: 1, address: 1, phone: 1, website: 1, company: 1, profilePicData: 0, profilePicContentType: 0 })
             .lean();
 
         if (!user) {
@@ -117,9 +139,14 @@ async function getUserById(req, res) {
         }
 
         const posts = await Post.find({ userId })
-            .select({ _id: 0, postId: 1, userId: 1, title: 1, body: 1, imageUrl: 1, hashtags: 1, likes: 1, likedBy: 1, createdAt: 1, updatedAt: 1 })
+            .select({ _id: 0, postId: 1, userId: 1, title: 1, body: 1, imageUrl: 1, hashtags: 1, likes: 1, createdAt: 1, updatedAt: 1, imageData: 0 })
             .sort({ createdAt: -1 })
             .lean();
+
+        const normalizedPosts = posts.map((post) => ({
+            ...post,
+            likedBy: []
+        }));
 
         const followersCount = Array.isArray(user.followers) ? user.followers.length : 0;
         const followingCount = Array.isArray(user.following) ? user.following.length : 0;
@@ -129,7 +156,7 @@ async function getUserById(req, res) {
             success: true,
             data: {
                 user,
-                posts,
+                posts: normalizedPosts,
                 followersCount,
                 followingCount,
                 isFollowing
@@ -170,14 +197,19 @@ async function getUserPosts(req, res) {
         }
 
         const posts = await Post.find({ userId })
-            .select({ _id: 0, postId: 1, userId: 1, title: 1, body: 1, imageUrl: 1, hashtags: 1, likes: 1, likedBy: 1, createdAt: 1, updatedAt: 1 })
+            .select({ _id: 0, postId: 1, userId: 1, title: 1, body: 1, imageUrl: 1, hashtags: 1, likes: 1, createdAt: 1, updatedAt: 1, imageData: 0 })
             .sort({ createdAt: -1 })
             .lean();
 
+        const normalizedPosts = posts.map((post) => ({
+            ...post,
+            likedBy: []
+        }));
+
         return res.status(200).json({
             success: true,
-            data: posts,
-            count: posts.length,
+            data: normalizedPosts,
+            count: normalizedPosts.length,
             message: 'User posts fetched successfully'
         });
     } catch (error) {
@@ -325,7 +357,7 @@ async function uploadProfilePic(req, res) {
         }
 
         const previousImage = String(user.profilePic || user.imageUrl || '').trim();
-        const uploadResult = await uploadBufferToMedia(req.file.buffer, {
+        const uploadResult = await processUpload(req.file.buffer, {
             folder: 'profile_pics',
             mimetype: req.file.mimetype,
             transformation: [

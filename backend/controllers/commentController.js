@@ -11,6 +11,7 @@ function buildCacheKey(prefix, value) {
 
 function invalidateCommentCaches(postId) {
     cache.clearByPrefix('posts:list:');
+    cache.clearByPrefix('feed:');
     cache.clearByPrefix('search:');
     cache.clearByPrefix('stats:');
     cache.clear(buildCacheKey('posts:detail', postId));

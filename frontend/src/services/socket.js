@@ -31,21 +31,31 @@ const SOCKET_OPTIONS = import.meta.env.DEV
         autoConnect: false
     };
 
-const socket = io(SOCKET_URL, SOCKET_OPTIONS);
+const socket = io(`${SOCKET_URL}/feed`, SOCKET_OPTIONS);
+const searchSocket = io(`${SOCKET_URL}/search`, SOCKET_OPTIONS);
+const presenceSocket = io(`${SOCKET_URL}/presence`, SOCKET_OPTIONS);
 
 function connectSocket() {
     if (!socket.connected) {
         socket.connect();
     }
+
+    if (!searchSocket.connected) {
+        searchSocket.connect();
+    }
+
+    if (!presenceSocket.connected) {
+        presenceSocket.connect();
+    }
 }
 
 function onSearchResults(handler) {
-    socket.on('results', handler);
-    return () => socket.off('results', handler);
+    searchSocket.on('results', handler);
+    return () => searchSocket.off('results', handler);
 }
 
 function emitSearch(query, debounceMs = 300) {
-    socket.emit('search', { query, debounceMs });
+    searchSocket.emit('search', { query, debounceMs });
 }
 
 function onLikeUpdated(handler) {
@@ -59,17 +69,18 @@ function onNewPost(handler) {
 }
 
 function onUserOnline(handler) {
-    socket.on('userOnline', handler);
-    return () => socket.off('userOnline', handler);
+    presenceSocket.on('userOnline', handler);
+    return () => presenceSocket.off('userOnline', handler);
 }
 
 function onUserOffline(handler) {
-    socket.on('userOffline', handler);
-    return () => socket.off('userOffline', handler);
+    presenceSocket.on('userOffline', handler);
+    return () => presenceSocket.off('userOffline', handler);
 }
 
 function identifyUser(userId) {
     socket.emit('identify', { userId });
+    presenceSocket.emit('identify', { userId });
 }
 
 function joinPost(postId) {
@@ -78,6 +89,8 @@ function joinPost(postId) {
 
 function disconnectSocket() {
     socket.disconnect();
+    searchSocket.disconnect();
+    presenceSocket.disconnect();
 }
 
 function onNotification(handler) {

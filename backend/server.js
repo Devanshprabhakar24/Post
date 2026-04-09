@@ -2,14 +2,19 @@ require('dotenv').config();
 
 const http = require('http');
 const { Server } = require('socket.io');
+const { createAdapter } = require('@socket.io/redis-adapter');
 const app = require('./app');
 const { connectDatabase, disconnectDatabase } = require('./config/db');
+const { ensureRedisClient } = require('./config/redis');
 const { attachSearchSocket } = require('./sockets/searchSocket');
 const { attachLikeSocket } = require('./sockets/likeSocket');
 const { attachNotificationSocket } = require('./sockets/notificationSocket');
 const { attachPostSocket } = require('./sockets/postSocket');
 const { attachPresenceSocket } = require('./sockets/presenceSocket');
 const { startSyncCronJob } = require('./jobs/syncCron');
+const { startLikeFlushJob } = require('./jobs/likeFlushJob');
+const { startUploadWorker, stopUploadWorker } = require('./jobs/uploadQueue');
+const { setActiveSocketConnections } = require('./metrics');
 
 // Services
 const apiService = require('./services/apiService');
@@ -64,6 +69,13 @@ async function upsertData(Model, items, idField, normalizeFn) {
  */
 async function bootstrap() {
     try {
+        const required = ['MONGO_URI', 'JWT_SECRET'];
+        required.forEach((key) => {
+            if (!String(process.env[key] || '').trim()) {
+                throw new Error(`Missing env: ${key}`);
+            }
+        });
+
         // Connect to MongoDB
         await connectDatabase();
         console.log('✓ Connected to MongoDB');
@@ -90,15 +102,49 @@ async function bootstrap() {
             transports: ['websocket', 'polling']
         });
 
-        // Attach search socket handler
-        attachSearchSocket(io);
-        attachLikeSocket(io);
-        attachNotificationSocket(io);
-        attachPostSocket(io);
-        attachPresenceSocket(io);
+        const redisClient = await ensureRedisClient();
+        if (redisClient) {
+            const subClient = redisClient.duplicate();
+            try {
+                if (subClient.status === 'wait') {
+                    await subClient.connect();
+                }
+
+                io.adapter(
+                    createAdapter(redisClient, subClient, {
+                        key: String(process.env.SOCKET_REDIS_PREFIX || 'pe:socket')
+                    })
+                );
+                console.log('✓ Socket.IO Redis adapter enabled');
+            } catch (_error) {
+                console.warn('⚠️  Socket.IO Redis adapter unavailable, using in-memory adapter');
+            }
+        }
+
+        const searchNamespace = io.of('/search');
+        const feedNamespace = io.of('/feed');
+        const presenceNamespace = io.of('/presence');
+
+        attachSearchSocket(searchNamespace);
+        attachLikeSocket(feedNamespace);
+        attachNotificationSocket(feedNamespace);
+        attachPostSocket(feedNamespace);
+        attachPresenceSocket(presenceNamespace);
+
+        io.on('connection', () => {
+            setActiveSocketConnections(io.engine.clientsCount);
+        });
+        io.engine.on('connection_error', () => {
+            setActiveSocketConnections(io.engine.clientsCount);
+        });
+        io.engine.on('close', () => {
+            setActiveSocketConnections(io.engine.clientsCount);
+        });
 
         // Start hourly fetch cron
         const cronTask = startSyncCronJob();
+        const likeFlushJob = startLikeFlushJob();
+        startUploadWorker();
 
         // Seed data from external API on startup
         console.log('\n📊 Seeding data from JSONPlaceholder API...');
@@ -191,6 +237,8 @@ async function bootstrap() {
             }
 
             cronTask.stop();
+            likeFlushJob.stop();
+            await stopUploadWorker();
             io.close();
             await disconnectDatabase();
             process.exit(1);
@@ -217,12 +265,31 @@ async function bootstrap() {
         // Graceful shutdown
         const shutdown = async (signal) => {
             console.log(`\n⏹️  Received ${signal}, shutting down gracefully...`);
-            server.close(() => {
-                console.log('  ✓ HTTP server closed');
+
+            const forceExitTimer = setTimeout(() => {
+                process.exit(1);
+            }, 10_000);
+
+            await new Promise((resolve) => {
+                server.close(() => {
+                    console.log('  ✓ HTTP server closed');
+                    resolve();
+                });
             });
+
             cronTask.stop();
-            io.close();
+            likeFlushJob.stop();
+            await likeFlushJob.flush();
+            await stopUploadWorker();
+            await io.close();
+
+            const redis = ensureRedisClient ? await ensureRedisClient() : null;
+            if (redis) {
+                await redis.quit();
+            }
+
             await disconnectDatabase();
+            clearTimeout(forceExitTimer);
             console.log('  ✓ Database connection closed');
             process.exit(0);
         };

@@ -5,27 +5,38 @@ export default {
     theme: {
         extend: {
             colors: {
-                surface: {
-                    950: '#060b14',
-                    900: '#0a1322',
-                    800: '#121f34'
-                },
-                accent: {
-                    400: '#22d3ee',
-                    500: '#06b6d4'
-                }
+                ink: 'var(--ink)',
+                'ink-soft': 'var(--ink-soft)',
+                paper: 'var(--paper)',
+                'paper-mid': 'var(--paper-mid)',
+                volt: 'var(--volt)',
+                'volt-dim': 'var(--volt-dim)',
+                mist: 'var(--mist)',
+                ember: 'var(--ember)',
+                void: 'var(--void)'
+            },
+            fontFamily: {
+                display: ['Bebas Neue', 'Impact', 'sans-serif'],
+                body: ['Crimson Pro', 'Georgia', 'serif'],
+                ui: ['DM Mono', 'Menlo', 'monospace']
             },
             boxShadow: {
-                glow: '0 20px 40px rgba(6, 182, 212, 0.18)'
+                editorial: '0 18px 48px rgba(10, 10, 15, 0.12)',
+                'editorial-dark': '0 24px 70px rgba(4, 4, 12, 0.55)'
             },
             keyframes: {
                 shimmer: {
                     '0%': { backgroundPosition: '-200% 0' },
                     '100%': { backgroundPosition: '200% 0' }
+                },
+                'volt-pulse': {
+                    '0%': { boxShadow: '0 0 0 0 rgba(200, 241, 53, 0.55)' },
+                    '100%': { boxShadow: '0 0 0 16px rgba(200, 241, 53, 0)' }
                 }
             },
             animation: {
-                shimmer: 'shimmer 1.8s linear infinite'
+                shimmer: 'shimmer 1.8s linear infinite',
+                'volt-pulse': 'volt-pulse 0.6s ease-out'
             }
         }
     },

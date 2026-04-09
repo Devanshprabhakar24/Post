@@ -80,32 +80,32 @@ export default function RightPanel({ users = [], posts = [] }) {
 
     return (
         <aside className="sticky top-[88px] hidden h-[calc(100vh-110px)] space-y-4 self-start overflow-y-auto pr-1 lg:block">
-            <section className="rounded-3xl border border-slate-200/80 bg-white/72 p-4 backdrop-blur-xl dark:border-cyan-200/15 dark:bg-slate-900/72">
-                <h3 className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-                    <Flame className="h-4 w-4 text-orange-300" /> Trending
+            <section className="editorial-surface rounded-3xl border border-mist/30 p-4">
+                <h3 className="mb-3 inline-flex items-center gap-2 font-display text-3xl leading-none text-paper">
+                    <Flame className="h-4 w-4 text-ember" /> Trending
                 </h3>
 
                 <div className="space-y-2">
                     {trendingHashtags.length === 0 ? (
-                        <p className="text-sm text-slate-500 dark:text-slate-300">No hashtags yet.</p>
+                        <p className="font-body text-sm italic text-mist">No hashtags yet.</p>
                     ) : (
                         trendingHashtags.map((item) => (
                             <Link
                                 key={item.tag}
                                 to={`/hashtags/${item.tag}`}
-                                className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-white/75 px-3 py-2 text-sm text-slate-800 transition hover:border-cyan-300/45 hover:bg-cyan-500/14 dark:border-white/15 dark:bg-white/10 dark:text-slate-100"
+                                className="flex items-center justify-between rounded-xl border border-mist/30 bg-ink/25 px-3 py-2 font-ui text-xs uppercase tracking-[0.14em] text-paper transition hover:border-volt/55 hover:text-volt"
                             >
                                 <span className="inline-flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> {item.tag}</span>
-                                <span className="text-xs text-slate-500 dark:text-slate-300">{item.count}</span>
+                                <span className="text-xs text-mist">{item.count}</span>
                             </Link>
                         ))
                     )}
                 </div>
             </section>
 
-            <section className="rounded-3xl border border-slate-200/80 bg-white/72 p-4 backdrop-blur-xl dark:border-cyan-200/15 dark:bg-slate-900/72">
-                <h3 className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
-                    <UserPlus2 className="h-4 w-4 text-cyan-300" /> Who to follow
+            <section className="editorial-surface rounded-3xl border border-mist/30 p-4">
+                <h3 className="mb-3 inline-flex items-center gap-2 font-display text-3xl leading-none text-paper">
+                    <UserPlus2 className="h-4 w-4 text-volt" /> Follow
                 </h3>
 
                 <div className="space-y-2.5">
@@ -113,21 +113,21 @@ export default function RightPanel({ users = [], posts = [] }) {
                         const isFollowing = Boolean(followingState[entry.userId]);
 
                         return (
-                            <div key={entry.userId} className="flex items-center justify-between rounded-xl border border-slate-200/80 bg-white/75 px-3 py-2 dark:border-white/15 dark:bg-white/10">
+                            <div key={entry.userId} className="flex items-center justify-between rounded-xl border border-mist/30 bg-ink/25 px-3 py-2">
                                 <Link to={`/profile/${entry.userId}`} className="min-w-0">
-                                    <p className="truncate text-sm font-medium text-slate-900 dark:text-white">{entry.name}</p>
-                                    <p className="truncate text-xs text-slate-600 dark:text-slate-300">@{entry.username || entry.email}</p>
+                                    <p className="truncate font-display text-2xl leading-none text-paper">{entry.name}</p>
+                                    <p className="truncate ui-font text-[10px] uppercase tracking-[0.14em] text-mist">@{entry.username || entry.email}</p>
                                 </Link>
 
                                 <button
                                     type="button"
                                     onClick={() => handleFollowToggle(entry.userId)}
                                     disabled={pendingId === entry.userId}
-                                    className="group relative min-w-[84px] rounded-full bg-cyan-400 px-3 py-1.5 text-xs font-semibold text-slate-950 transition hover:bg-cyan-300 disabled:opacity-70"
+                                    className="group relative min-w-[84px] rounded-full border border-volt/75 bg-volt px-3 py-1.5 ui-font text-[10px] uppercase tracking-[0.14em] text-ink transition hover:bg-volt-dim disabled:opacity-70"
                                 >
                                     {pendingId === entry.userId ? '...' : isFollowing ? 'Following' : 'Follow'}
                                     {isFollowing && (
-                                        <span className="pointer-events-none absolute inset-0 hidden items-center justify-center rounded-full bg-rose-500 text-white group-hover:flex">
+                                        <span className="pointer-events-none absolute inset-0 hidden items-center justify-center rounded-full bg-ember text-ink group-hover:flex">
                                             Unfollow
                                         </span>
                                     )}

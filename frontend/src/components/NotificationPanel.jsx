@@ -1,32 +1,12 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { BellRing, CheckCheck, ChevronRight, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { BellRing, CheckCheck, ChevronRight, Heart, MessageCircle, Trash2, UserRound } from 'lucide-react';
 import { useSocketContext } from '../context/SocketContext';
-import { Button } from './ui/button';
-
-function getNotificationLabel(item) {
-    if (item?.type === 'like') {
-        return { label: 'Like', icon: Heart, action: 'Open post' };
-    }
-
-    if (item?.type === 'comment') {
-        return { label: 'Comment', icon: MessageCircle, action: 'View discussion' };
-    }
-
-    if (item?.type === 'reply') {
-        return { label: 'Reply', icon: MessageCircle, action: 'View thread' };
-    }
-
-    if (item?.type === 'post') {
-        return { label: 'Post', icon: UserRound, action: 'Open post' };
-    }
-
-    return { label: 'Notification', icon: BellRing, action: 'Open item' };
-}
+import { drawerItemVariants, drawerVariants } from '../lib/motion';
 
 export default function NotificationPanel({ open, onClose }) {
     const { notifications, markAllRead, markNotificationAsRead, clearNotifications } = useSocketContext();
-    const prefersReducedMotion = useReducedMotion();
+    const reduced = useReducedMotion();
 
     return (
         <AnimatePresence>
@@ -34,108 +14,88 @@ export default function NotificationPanel({ open, onClose }) {
                 <>
                     <motion.button
                         type="button"
-                        aria-label="Close notifications"
                         onClick={onClose}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-40 bg-black/40"
+                        className="fixed inset-0 z-[85] bg-black/55"
+                        aria-label="Close notifications"
                     />
 
                     <motion.aside
-                        initial={{ opacity: 0, x: 48 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: 48 }}
-                        transition={prefersReducedMotion ? { duration: 0 } : { duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                        className="fixed right-0 top-0 z-50 h-screen w-[min(94vw,26rem)] border-l border-cyan-200/10 bg-slate-950/95 p-4 sm:p-5 shadow-2xl backdrop-blur-xl"
+                        variants={drawerVariants}
+                        initial="closed"
+                        animate="open"
+                        exit="closed"
+                        transition={reduced ? { duration: 0 } : undefined}
+                        className="fixed right-0 top-0 z-[90] h-screen w-[min(95vw,430px)] border-l border-volt/45 bg-ink-soft/95 p-5 shadow-2xl backdrop-blur-2xl"
                     >
-                        <div className="mb-4 mt-1 flex items-center justify-between">
-                            <h3 className="inline-flex items-center gap-2 text-sm font-semibold text-white">
-                                <BellRing className="h-4 w-4 text-cyan-300" /> Notifications
-                            </h3>
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="text-xs text-slate-400 transition hover:text-white"
-                            >
+                        <div className="mb-5 flex items-center justify-between">
+                            <h3 className="font-display text-4xl text-paper">Alerts</h3>
+                            <button type="button" onClick={onClose} className="ui-font text-xs uppercase tracking-[0.18em] text-mist hover:text-volt">
                                 Close
                             </button>
                         </div>
 
-                        <div className="mb-4 flex items-center gap-2">
-                            <Button type="button" variant="ghost" size="sm" onClick={markAllRead}>
-                                <CheckCheck className="mr-1 h-3.5 w-3.5" /> Mark all read
-                            </Button>
-                            <Button type="button" variant="ghost" size="sm" onClick={clearNotifications}>
-                                <Trash2 className="mr-1 h-3.5 w-3.5" /> Clear
-                            </Button>
+                        <div className="mb-4 flex gap-2">
+                            <button type="button" onClick={markAllRead} className="rounded-full border border-volt/55 px-3 py-1 ui-font text-[11px] uppercase tracking-[0.14em] text-volt hover:bg-volt hover:text-ink">
+                                <CheckCheck className="mr-1 inline h-3 w-3" /> Mark all
+                            </button>
+                            <button type="button" onClick={clearNotifications} className="rounded-full border border-mist/45 px-3 py-1 ui-font text-[11px] uppercase tracking-[0.14em] text-mist hover:border-ember hover:text-ember">
+                                <Trash2 className="mr-1 inline h-3 w-3" /> Clear
+                            </button>
                         </div>
 
-                        <div className="max-h-[calc(100vh-8.9rem)] space-y-2.5 overflow-y-auto pr-1">
+                        <div className="max-h-[calc(100vh-9rem)] space-y-2 overflow-y-auto pr-1">
                             {notifications.length === 0 ? (
-                                <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 text-sm text-slate-300">
-                                    No notifications yet.
+                                <div className="rounded-2xl border border-mist/30 p-4 text-center">
+                                    <BellRing className="mx-auto h-6 w-6 text-mist" />
+                                    <p className="mt-2 font-body italic text-mist">No alerts yet.</p>
                                 </div>
                             ) : (
-                                notifications.map((item) => (
-                                    item.targetUrl ? (
-                                        (() => {
-                                            const { label, icon: Icon, action } = getNotificationLabel(item);
-
-                                            return (
-                                        <Link
+                                notifications.map((item) => {
+                                    const card = (
+                                        <motion.div
                                             key={item.id}
-                                            to={item.targetUrl}
-                                            className={`block rounded-xl border p-3.5 text-sm transition duration-200 ease-out hover:-translate-y-0.5 hover:border-cyan-300/60 hover:bg-cyan-500/15 ${
-                                                item.read
-                                                    ? 'border-white/10 bg-white/5 text-slate-300'
-                                                    : 'border-cyan-400/30 bg-cyan-500/10 text-cyan-100'
-                                            }`}
+                                            variants={drawerItemVariants}
+                                            className={`rounded-2xl border p-3 ${item.read ? 'border-mist/28 bg-ink/35' : 'border-volt/50 bg-volt/10'}`}
                                         >
-                                            <div className="mb-2 flex items-center justify-between gap-2">
-                                                <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-300/30 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-medium uppercase tracking-[0.14em] text-cyan-200">
-                                                    <Icon className="h-3 w-3" /> {label}
-                                                </span>
-                                                <span className="inline-flex items-center gap-1 text-[11px] text-cyan-100/80">
-                                                    {action} <ChevronRight className="h-3.5 w-3.5" />
-                                                </span>
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="font-body text-sm text-paper">{item.message}</p>
+                                                    <p className="mt-1 ui-font text-[10px] uppercase tracking-[0.14em] text-mist">
+                                                        {new Date(item.createdAt).toLocaleTimeString()}
+                                                    </p>
+                                                </div>
+                                                {!item.read && (
+                                                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-ember" />
+                                                )}
                                             </div>
-                                            <p className="font-medium leading-snug text-white">{item.message}</p>
-                                            <p className="mt-1 text-xs text-slate-400">
-                                                {new Date(item.createdAt).toLocaleTimeString()}
-                                            </p>
                                             {!item.read && (
                                                 <button
                                                     type="button"
-                                                    onClick={(event) => {
-                                                        event.preventDefault();
-                                                        event.stopPropagation();
-                                                        markNotificationAsRead(item.id);
-                                                    }}
-                                                    className="mt-2 text-xs text-cyan-200 hover:text-cyan-100"
+                                                    onClick={() => markNotificationAsRead(item.id)}
+                                                    className="mt-2 ui-font text-[10px] uppercase tracking-[0.14em] text-volt"
                                                 >
-                                                    Mark as read
+                                                    Mark read
                                                 </button>
                                             )}
-                                        </Link>
-                                            );
-                                        })()
-                                    ) : (
-                                        <div
-                                            key={item.id}
-                                            className={`rounded-xl border p-3.5 text-sm ${
-                                                item.read
-                                                    ? 'border-white/10 bg-white/5 text-slate-300'
-                                                    : 'border-cyan-400/30 bg-cyan-500/10 text-cyan-100'
-                                            }`}
-                                        >
-                                            <p className="font-medium leading-snug text-white">{item.message}</p>
-                                            <p className="mt-1 text-xs text-slate-400">
-                                                {new Date(item.createdAt).toLocaleTimeString()}
-                                            </p>
-                                        </div>
-                                    )
-                                ))
+                                        </motion.div>
+                                    );
+
+                                    if (item.targetUrl) {
+                                        return (
+                                            <Link key={item.id} to={item.targetUrl} onClick={onClose} className="block">
+                                                {card}
+                                                <span className="mt-1 inline-flex items-center gap-1 ui-font text-[10px] uppercase tracking-[0.14em] text-mist">
+                                                    Open <ChevronRight className="h-3 w-3" />
+                                                </span>
+                                            </Link>
+                                        );
+                                    }
+
+                                    return card;
+                                })
                             )}
                         </div>
                     </motion.aside>
