@@ -1,8 +1,8 @@
-import { memo, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { Heart, MessageCircle, Share2, MoreHorizontal } from 'lucide-react';
+import { memo, useMemo } from 'react';
+import { Heart, MessageCircle, Share2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 // Gradient color schemes by topic
 const GRADIENT_MAP = {
@@ -31,6 +31,27 @@ function getAvatarColor(userId) {
     return AVATAR_COLORS[Number(userId || 0) % AVATAR_COLORS.length];
 }
 
+const TOPIC_META = {
+    design: { emoji: '🎨', tag: 'Design Case Study', badge: 'Creator' },
+    startup: { emoji: '🚀', tag: 'Milestone', badge: 'Verified' },
+    nature: { emoji: '🌿', tag: 'Photo Essay', badge: 'Photographer' },
+    tech: { emoji: '💻', tag: 'Tech Brief', badge: 'Builder' },
+    health: { emoji: '💪', tag: 'Wellness Story', badge: 'Creator' },
+    food: { emoji: '🍽️', tag: 'Food Story', badge: 'Creator' },
+    default: { emoji: '✨', tag: 'Featured Story', badge: 'Creator' }
+};
+
+function resolveTopic(hashtags = [], title = '', body = '') {
+    const pool = `${hashtags.join(' ')} ${title} ${body}`.toLowerCase();
+    if (pool.includes('design') || pool.includes('ux') || pool.includes('ui')) return 'design';
+    if (pool.includes('startup') || pool.includes('founder') || pool.includes('arr') || pool.includes('business')) return 'startup';
+    if (pool.includes('nature') || pool.includes('travel') || pool.includes('wildlife') || pool.includes('photo')) return 'nature';
+    if (pool.includes('tech') || pool.includes('ai') || pool.includes('code') || pool.includes('software')) return 'tech';
+    if (pool.includes('health') || pool.includes('fitness') || pool.includes('wellness')) return 'health';
+    if (pool.includes('food') || pool.includes('recipe') || pool.includes('cook')) return 'food';
+    return 'default';
+}
+
 
 function PostCard({
     post,
@@ -44,15 +65,23 @@ function PostCard({
     isOwnPost = false,
     onDelete,
     onTagClick,
-    isLive = false
+    isLive = false,
+    onOpenComments,
+    onRepost,
+    onShare,
+    onFollowUser
 }) {
+    const navigate = useNavigate();
     const displayName = post?.authorName || post?.author?.name || `User ${post?.userId}`;
     const displayHandle = post?.authorUsername || post?.author?.username || `user${post?.userId}`;
     const avatar = post?.author?.profilePic || post?.author?.imageUrl || '';
     const avatarColor = getAvatarColor(post?.userId);
     const likes = Number(post?.likes) || 0;
+    const reposts = Number(post?.repostsCount ?? post?.sharesCount ?? 0) || 0;
     const hashtags = Array.isArray(post?.hashtags) ? post.hashtags : [];
+    const topic = resolveTopic(hashtags, post?.title, post?.body);
     const gradient = getGradientByTopic(hashtags);
+    const topicMeta = TOPIC_META[topic] || TOPIC_META.default;
     
     const timeAgo = useMemo(() => {
         if (!post?.createdAt) return 'recently';
@@ -81,18 +110,105 @@ function PostCard({
 
     const getHashtagColor = (tag) => HASHTAG_COLORS[tag?.toLowerCase()] || HASHTAG_COLORS.default;
 
+    const getPostUrl = () => {
+        const path = `/posts/${post?.postId}`;
+        if (typeof window !== 'undefined') {
+            return `${window.location.origin}${path}`;
+        }
+        return path;
+    };
+
+    const handleFollow = () => {
+        if (typeof onFollowUser === 'function') {
+            onFollowUser(post);
+            return;
+        }
+
+        if (post?.userId) {
+            navigate(`/profile/${post.userId}`);
+        }
+    };
+
+    const handleComments = () => {
+        if (typeof onOpenComments === 'function') {
+            onOpenComments(post);
+            return;
+        }
+
+        if (typeof onOpenDetails === 'function') {
+            onOpenDetails(post);
+            return;
+        }
+
+        if (post?.postId) {
+            navigate(`/posts/${post.postId}`);
+        }
+    };
+
+    const handleRepost = async () => {
+        if (typeof onRepost === 'function') {
+            await onRepost(post);
+            return;
+        }
+
+        const url = getPostUrl();
+        if (navigator?.clipboard?.writeText) {
+            await navigator.clipboard.writeText(url);
+            toast.success('Post link copied for repost');
+            return;
+        }
+
+        toast.success('Ready to repost');
+    };
+
+    const handleShare = async () => {
+        if (typeof onShare === 'function') {
+            await onShare(post);
+            return;
+        }
+
+        const url = getPostUrl();
+        if (navigator?.share) {
+            try {
+                await navigator.share({ title: post?.title || 'Post', text: post?.body || '', url });
+                return;
+            } catch (_error) {
+                // Fall back to clipboard copy.
+            }
+        }
+
+        if (navigator?.clipboard?.writeText) {
+            await navigator.clipboard.writeText(url);
+            toast.success('Post link copied');
+            return;
+        }
+
+        toast.success('Share action triggered');
+    };
+
+    const handleImagePreview = (event) => {
+        if (typeof onOpenPreview === 'function') {
+            onOpenPreview(post, event);
+            return;
+        }
+
+        if (post?.postId) {
+            navigate(`/posts/${post.postId}`);
+        }
+    };
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: index * 0.04 }}
-            className="bg-white rounded-lg border-[0.5px] border-[#e8e8e8] overflow-hidden"
+            className="overflow-hidden rounded-lg border-[0.5px] border-[var(--border-light)] bg-[var(--bg-card)]"
         >
             {/* Post Header */}
-            <div className="p-4 flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3 flex-1">
+            <div className="flex items-start justify-between gap-2.5 p-3 sm:gap-3 sm:p-4">
+                <div className="flex flex-1 items-start gap-2.5 sm:gap-3">
                     <div
-                        className="flex-shrink-0 h-11 w-11 rounded-full flex items-center justify-center text-white font-semibold text-sm"
+                        className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white sm:h-11 sm:w-11"
                         style={{ backgroundColor: avatarColor }}
                     >
                         {avatar ? (
@@ -101,55 +217,65 @@ function PostCard({
                             displayName.charAt(0).toUpperCase()
                         )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                            <p className="text-[13px] font-semibold text-[#111]">{displayName}</p>
+                    <div className="min-w-0 flex-1">
+                        <div className="mb-1 flex items-center gap-1.5 sm:gap-2">
+                            <p className="text-[13px] font-semibold text-[var(--text-primary)]">{displayName}</p>
                             <span
-                                className="text-[10px] font-semibold px-2 py-0.5 rounded-lg"
+                                className="rounded-lg px-1.5 py-0.5 text-[9px] font-semibold sm:px-2 sm:text-[10px]"
                                 style={{
-                                    backgroundColor: getHashtagColor('design').bg,
-                                    color: getHashtagColor('design').text
+                                    backgroundColor: getHashtagColor(topic).bg,
+                                    color: getHashtagColor(topic).text
                                 }}
                             >
-                                ✦ Creator
+                                ✦ {topicMeta.badge}
                             </span>
                         </div>
-                        <p className="text-[11px] text-[#888]">@{displayHandle}</p>
-                        <p className="text-[10px] text-[#bbb] mt-1">{timeAgo} · 🌐 Public</p>
+                        <p className="text-[11px] text-[var(--text-secondary)]">@{displayHandle}</p>
+                        <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">{timeAgo} · 🌐 Public</p>
                     </div>
                 </div>
-                <button className="border-[1.5px] border-[#e63946] text-[#e63946] px-4 py-1 rounded-full text-[12px] font-semibold hover:bg-red-50">
+                <button
+                    type="button"
+                    onClick={handleFollow}
+                    className="rounded-full border-[1.5px] border-[var(--accent-red)] px-3 py-1 text-[11px] font-semibold text-[var(--accent-red)] hover:bg-red-50 dark:hover:bg-red-500/15 sm:px-4 sm:text-[12px]"
+                >
                     + Follow
                 </button>
             </div>
 
             {/* Post Text */}
-            <div className="px-4 pb-3">
+            <div className="px-3 pb-3 sm:px-4">
                 <button
                     onClick={() => onOpenDetails?.(post)}
                     className="block w-full text-left hover:opacity-80"
                 >
-                    <p className="text-[13px] text-[#333] leading-[1.6]">{post?.title}</p>
+                    <p className="text-[13px] leading-[1.6] text-[var(--text-secondary)]">{post?.body || post?.title}</p>
                 </button>
             </div>
 
             {/* Image Block with Gradient */}
-            <div
-                className="w-full h-[200px] flex items-center justify-center text-white relative overflow-hidden"
-                style={{ background: gradient.bg }}
-            >
-                <div className="text-center z-10">
-                    <div className="text-6xl mb-2">🎨</div>
-                    <p className="text-white font-semibold text-base mb-1">Design Masterpiece</p>
-                    <p className="text-white/70 text-xs">2025</p>
+            {post?.imageUrl ? (
+                <button type="button" onClick={handleImagePreview} className="block w-full text-left" aria-label="Open image preview">
+                    <img src={post.imageUrl} alt={post?.title || 'Post'} className="h-[180px] w-full cursor-zoom-in object-cover sm:h-[200px]" loading="lazy" />
+                </button>
+            ) : (
+                <div
+                    className="relative flex h-[180px] w-full items-center justify-center overflow-hidden text-white sm:h-[200px]"
+                    style={{ background: gradient.bg }}
+                >
+                    <div className="text-center z-10 px-4">
+                        <div className="text-6xl mb-2">{topicMeta.emoji}</div>
+                        <p className="text-white font-semibold text-base mb-1 line-clamp-1">{post?.title || 'Untitled Post'}</p>
+                        <p className="text-white/70 text-xs line-clamp-1">{displayName}</p>
+                    </div>
+                    <div className="absolute left-3 top-3 rounded-full bg-black/55 px-2 py-1 text-[10px] text-white">
+                        {topicMeta.tag}
+                    </div>
                 </div>
-                <div className="absolute top-3 left-3 bg-black/55 text-white text-[10px] px-2 py-1 rounded-full">
-                    Design Case Study
-                </div>
-            </div>
+            )}
 
             {/* Hashtags */}
-            <div className="px-4 pt-3 pb-2 flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 px-3 pb-2 pt-3 sm:px-4">
                 {hashtags.slice(0, 3).map((tag) => {
                     const colors = getHashtagColor(tag);
                     return (
@@ -169,12 +295,12 @@ function PostCard({
             </div>
 
             {/* Reaction Stats */}
-            <div className="px-4 py-2 flex items-center gap-2 border-b-[0.5px] border-[#f0f0f0] text-[11px] text-[#999]">
+            <div className="flex items-center gap-2 border-b-[0.5px] border-[var(--border-subtle)] px-3 py-2 text-[10px] text-[var(--text-tertiary)] sm:px-4 sm:text-[11px]">
                 <div className="flex gap-1">
                     {reactionPills.map((pill, idx) => (
                         <div
                             key={idx}
-                            className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] border-[1.5px] border-white"
+                            className="flex h-5 w-5 items-center justify-center rounded-full border-[1.5px] border-[var(--bg-card)] text-[10px]"
                             style={{ backgroundColor: idx === 0 ? '#e63946' : idx === 1 ? '#ff9800' : '#9c27b0' }}
                         >
                             {pill}
@@ -183,31 +309,32 @@ function PostCard({
                 </div>
                 <span className="ml-0.5">{likes} reactions</span>
                 <div className="flex-1" />
-                <span>{post?.commentsCount ?? 0} comments · {likes} reposts</span>
+                <span>{post?.commentsCount ?? 0} comments · {reposts} reposts</span>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex py-1 px-2">
+            <div className="flex px-1.5 py-1 sm:px-2">
                 <button
                     onClick={() => onToggleLike(post)}
                     disabled={isLiking}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[12px] font-medium border-none cursor-pointer transition ${
+                    className={`flex flex-1 items-center justify-center gap-1 rounded-lg border-none py-2 text-[11px] font-medium transition sm:gap-2 sm:text-[12px] ${
                         post?.isLiked
                             ? 'text-[#e63946]'
-                            : 'text-[#666] hover:bg-red-50'
+                            : 'text-[var(--text-secondary)] hover:bg-red-50 dark:hover:bg-red-500/15'
                     }`}
+                    aria-label={post?.isLiked ? 'Unlike post' : 'Like post'}
                 >
                     <Heart size={16} fill={post?.isLiked ? 'currentColor' : 'none'} />
-                    {post?.isLiked ? 'Liked' : 'Like'}
+                    <span className="hidden sm:inline">{post?.isLiked ? 'Liked' : 'Like'}</span>
                 </button>
-                <button className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[12px] font-medium text-[#666] hover:bg-gray-50">
-                    <MessageCircle size={16} /> Comment
+                <button type="button" onClick={handleComments} className="flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-[11px] font-medium text-[var(--text-secondary)] hover:bg-gray-50 dark:hover:bg-white/5 sm:gap-2 sm:text-[12px]" aria-label="Open comments">
+                    <MessageCircle size={16} /> <span className="hidden sm:inline">Comment</span>
                 </button>
-                <button className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[12px] font-medium text-[#666] hover:bg-gray-50">
-                    <Share2 size={16} /> Repost
+                <button type="button" onClick={handleRepost} className="flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-[11px] font-medium text-[var(--text-secondary)] hover:bg-gray-50 dark:hover:bg-white/5 sm:gap-2 sm:text-[12px]" aria-label="Repost">
+                    <Share2 size={16} /> <span className="hidden sm:inline">Repost</span>
                 </button>
-                <button className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-[12px] font-medium text-[#666] hover:bg-gray-50">
-                    <Share2 size={16} style={{ transform: 'rotate(90deg)' }} /> Share
+                <button type="button" onClick={handleShare} className="flex flex-1 items-center justify-center gap-1 rounded-lg py-2 text-[11px] font-medium text-[var(--text-secondary)] hover:bg-gray-50 dark:hover:bg-white/5 sm:gap-2 sm:text-[12px]" aria-label="Share post">
+                    <Share2 size={16} style={{ transform: 'rotate(90deg)' }} /> <span className="hidden sm:inline">Share</span>
                 </button>
             </div>
         </motion.div>

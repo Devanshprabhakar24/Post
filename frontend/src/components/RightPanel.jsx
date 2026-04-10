@@ -1,7 +1,4 @@
 import { useMemo, useState } from 'react';
-import { Flame, UserPlus2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { followUser, unfollowUser } from '../services/api';
 
@@ -24,12 +21,24 @@ function getTrendingHashtags(posts) {
         .map(([tag, count]) => ({ tag: tag.charAt(0).toUpperCase() + tag.slice(1), count }));
 }
 
+    function getFallbackTopics(posts) {
+        const candidates = ['Design', 'Tech', 'Startup', 'Product'];
+        const postCount = Math.max(1, Array.isArray(posts) ? posts.length : 0);
+        return candidates.map((tag, index) => ({
+            tag,
+            count: Math.max(1, Math.floor(postCount / (index + 1)))
+        }));
+    }
+
 export default function RightPanel({ users = [], posts = [] }) {
     const { user } = useAuth();
     const [pendingId, setPendingId] = useState(null);
     const [followingState, setFollowingState] = useState({});
 
-    const trendingHashtags = useMemo(() => getTrendingHashtags(posts), [posts]);
+    const trendingHashtags = useMemo(() => {
+        const computed = getTrendingHashtags(posts);
+        return computed.length ? computed : getFallbackTopics(posts);
+    }, [posts]);
     const uniqueUsers = useMemo(() => {
         const seen = new Set();
         return (users || []).filter((entry) => {
@@ -46,9 +55,8 @@ export default function RightPanel({ users = [], posts = [] }) {
         () => {
             const currentUserId = Number(user?.userId);
             const registeredUsers = uniqueUsers.filter((entry) => entry?.isExternal === false);
-            const pool = registeredUsers.length > 0 ? registeredUsers : uniqueUsers;
 
-            return pool
+            return registeredUsers
                 .filter((entry) => Number(entry.userId) !== currentUserId)
                 .sort((a, b) => Number(b.userId) - Number(a.userId))
                 .slice(0, 3);
@@ -84,30 +92,30 @@ export default function RightPanel({ users = [], posts = [] }) {
     };
 
     return (
-        <aside className="sticky top-[72px] hidden h-[calc(100vh-72px)] w-[200px] self-start overflow-y-auto pl-2 lg:block">
+        <aside className="sticky top-[84px] hidden h-[calc(100vh-96px)] w-[200px] self-start overflow-y-auto pl-1 lg:block">
             {/* Trending Card */}
-            <div className="bg-white rounded-lg border-[0.5px] border-[#e8e8e8] p-4 mb-4">
-                <h3 className="text-[12px] font-semibold text-[#111] mb-3">Trending topics</h3>
+            <div className="mb-4 rounded-lg border-[0.5px] border-[var(--border-light)] bg-[var(--bg-card)] p-4">
+                <h3 className="mb-3 text-[12px] font-semibold text-[var(--text-primary)]">Trending topics</h3>
                 <div className="space-y-2">
                     {trendingHashtags.map((item) => (
-                        <div key={item.tag} className="pb-3 border-b-[0.5px] border-[#f5f5f5] last:border-b-0">
-                            <p className="text-[12px] font-semibold text-[#e63946]">#{item.tag}</p>
-                            <p className="text-[10px] text-[#bbb] mt-0.5">{item.count}k posts today</p>
+                        <div key={item.tag} className="border-b-[0.5px] border-[var(--border-subtle)] pb-3 last:border-b-0">
+                            <p className="text-[12px] font-semibold text-[var(--accent-red)]">#{item.tag}</p>
+                            <p className="mt-0.5 text-[10px] text-[var(--text-tertiary)]">{item.count} posts</p>
                         </div>
                     ))}
                 </div>
             </div>
 
             {/* People to Follow Card */}
-            <div className="bg-white rounded-lg border-[0.5px] border-[#e8e8e8] p-4 mb-4">
-                <h3 className="text-[12px] font-semibold text-[#111] mb-3">People to follow</h3>
+            <div className="mb-4 rounded-lg border-[0.5px] border-[var(--border-light)] bg-[var(--bg-card)] p-4">
+                <h3 className="mb-3 text-[12px] font-semibold text-[var(--text-primary)]">People to follow</h3>
                 <div className="space-y-3">
-                    {suggestions.map((entry) => {
+                    {suggestions.length > 0 ? suggestions.map((entry) => {
                         const isFollowing = Boolean(followingState[entry.userId]);
                         const avatarColor = getAvatarColor(entry.userId);
 
                         return (
-                            <div key={entry.userId} className="flex items-center gap-2 pb-3 border-b-[0.5px] border-[#f5f5f5] last:border-b-0">
+                            <div key={entry.userId} className="flex items-center gap-2 border-b-[0.5px] border-[var(--border-subtle)] pb-3 last:border-b-0">
                                 <div
                                     className="flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center text-white text-[11px] font-semibold"
                                     style={{ backgroundColor: avatarColor }}
@@ -115,29 +123,24 @@ export default function RightPanel({ users = [], posts = [] }) {
                                     {entry.name?.charAt(0).toUpperCase() || 'U'}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-[12px] font-semibold text-[#111] truncate">{entry.name}</p>
-                                    <p className="text-[10px] text-[#999]">@{entry.username}</p>
+                                    <p className="truncate text-[12px] font-semibold text-[var(--text-primary)]">{entry.name}</p>
+                                    <p className="text-[10px] text-[var(--text-tertiary)]">@{entry.username}</p>
                                 </div>
                                 <button
                                     onClick={() => handleFollowToggle(entry.userId)}
                                     disabled={pendingId === entry.userId}
-                                    className="flex-shrink-0 h-6 px-2 rounded-full bg-gray-100 text-[10px] font-semibold text-gray-600 hover:bg-gray-200 border-[0.5px] border-[#ddd]"
+                                    className="h-6 flex-shrink-0 rounded-full border-[0.5px] border-[var(--border-soft)] bg-[var(--bg-card-soft)] px-2 text-[10px] font-semibold text-[var(--text-secondary)] hover:opacity-90"
                                 >
                                     {isFollowing ? 'Following' : 'Follow'}
                                 </button>
                             </div>
                         );
-                    })}
+                    }) : (
+                        <p className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card-soft)] px-3 py-2 text-[11px] text-[var(--text-tertiary)]">
+                            No registered users to suggest yet.
+                        </p>
+                    )}
                 </div>
-            </div>
-
-            {/* Premium Card */}
-            <div className="bg-[#e63946] rounded-lg overflow-hidden text-white p-4">
-                <p className="text-[13px] font-semibold mb-1">Go Premium</p>
-                <p className="text-[11px] opacity-90 mb-3">Unlock analytics, verified badge & priority reach</p>
-                <button className="w-full bg-white text-[#e63946] font-semibold text-[12px] py-2 rounded-full hover:bg-gray-50">
-                    Upgrade now
-                </button>
             </div>
         </aside>
     );

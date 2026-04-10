@@ -41,6 +41,19 @@ async function fetchPosts(params = {}, options = {}) {
     }
 }
 
+async function searchPosts(query, options = {}) {
+    try {
+        const { data } = await api.get('/api/search', {
+            params: { q: query },
+            signal: options.signal
+        });
+
+        return Array.isArray(data?.data) ? data.data : [];
+    } catch (error) {
+        throw new Error(getErrorMessage(error, 'Failed to search posts'));
+    }
+}
+
 async function createPost(payload) {
     try {
         const imageFile = payload?.imageFile || null;
@@ -309,6 +322,7 @@ export {
     loginUser,
     registerUser,
     fetchPosts,
+    searchPosts,
     createPost,
     uploadProfilePicture,
     uploadImage,

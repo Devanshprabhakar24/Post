@@ -2,7 +2,6 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import Cursor from './components/Cursor';
 import ErrorBoundary from './components/ErrorBoundary';
 import LeftSidebar from './components/LeftSidebar';
 import Loader from './components/Loader';
@@ -20,6 +19,7 @@ const PostDetails = lazy(() => import('./pages/PostDetails'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
 const Profile = lazy(() => import('./pages/Profile'));
+const Connections = lazy(() => import('./pages/Connections'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 const THEME_KEY = 'post-explorer-theme';
@@ -98,13 +98,15 @@ function AppShell({ pageProps, theme, setTheme, query, setQuery, searching, sear
             <main
                 id="main-content"
                 aria-label="Main content"
-                className="mx-auto grid w-full max-w-[1600px] grid-cols-1 gap-5 px-4 pb-14 pt-6 lg:grid-cols-[260px_minmax(0,860px)_320px]"
+                className="mx-auto grid w-full max-w-[1400px] grid-cols-1 gap-2 px-2 pb-10 pt-2 sm:gap-3 sm:px-4 sm:pt-3 md:grid-cols-[220px_minmax(0,1fr)] lg:grid-cols-[220px_minmax(0,1fr)_200px]"
             >
                 <LeftSidebar
                     onOpenNotifications={() => setNotificationOpen(true)}
                     mobileOpen={mobileSidebarOpen}
                     onClose={() => setMobileSidebarOpen(false)}
                     theme={theme}
+                    users={users}
+                    posts={panelPosts}
                 />
 
                 <section className="min-h-[calc(100vh-92px)] min-w-0">
@@ -157,6 +159,46 @@ function AppShell({ pageProps, theme, setTheme, query, setQuery, searching, sear
                                         <AnimatedRoute>
                                             <ProtectedRoute isAuthenticated={isAuthenticated}>
                                                 <Profile />
+                                            </ProtectedRoute>
+                                        </AnimatedRoute>
+                                    }
+                                />
+                                <Route
+                                    path="/profile/followers"
+                                    element={
+                                        <AnimatedRoute>
+                                            <ProtectedRoute isAuthenticated={isAuthenticated}>
+                                                <Connections mode="followers" />
+                                            </ProtectedRoute>
+                                        </AnimatedRoute>
+                                    }
+                                />
+                                <Route
+                                    path="/profile/following"
+                                    element={
+                                        <AnimatedRoute>
+                                            <ProtectedRoute isAuthenticated={isAuthenticated}>
+                                                <Connections mode="following" />
+                                            </ProtectedRoute>
+                                        </AnimatedRoute>
+                                    }
+                                />
+                                <Route
+                                    path="/profile/:id/followers"
+                                    element={
+                                        <AnimatedRoute>
+                                            <ProtectedRoute isAuthenticated={isAuthenticated}>
+                                                <Connections mode="followers" />
+                                            </ProtectedRoute>
+                                        </AnimatedRoute>
+                                    }
+                                />
+                                <Route
+                                    path="/profile/:id/following"
+                                    element={
+                                        <AnimatedRoute>
+                                            <ProtectedRoute isAuthenticated={isAuthenticated}>
+                                                <Connections mode="following" />
                                             </ProtectedRoute>
                                         </AnimatedRoute>
                                     }
@@ -281,8 +323,7 @@ export default function App() {
 
     return (
         <ErrorBoundary>
-            <Cursor />
-            <div className="min-h-screen bg-transparent text-paper">
+            <div className="min-h-screen bg-transparent text-[var(--text-primary)]">
                 <a
                     href="#main-content"
                     className="sr-only z-[100] rounded bg-volt px-4 py-2 text-ink focus:not-sr-only focus:fixed focus:left-4 focus:top-4"

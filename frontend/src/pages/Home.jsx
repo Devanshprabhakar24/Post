@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -6,9 +6,6 @@ import EmptyState from '../components/EmptyState';
 import Loader from '../components/Loader';
 import PostModal from '../components/PostModal';
 import PostCard from '../components/PostCard';
-import TextReveal from '../components/TextReveal';
-import LeftSidebar from '../components/LeftSidebar';
-import RightPanel from '../components/RightPanel';
 import { useAuth } from '../context/AuthContext';
 import { useSocketContext } from '../context/SocketContext';
 import useDebounce from '../hooks/useDebounce';
@@ -16,6 +13,7 @@ import {
     createPost,
     deletePost,
     fetchPosts,
+    searchPosts,
     fetchUsers,
     likePost,
     syncPosts,
@@ -107,6 +105,29 @@ function applySocketLike(list, payload, currentUserId) {
     });
 }
 
+function filterPostsByQuery(list, query) {
+    const normalizedQuery = String(query || '').trim().toLowerCase();
+    if (!normalizedQuery) {
+        return Array.isArray(list) ? list : [];
+    }
+
+    return (Array.isArray(list) ? list : []).filter((post) => {
+        const title = String(post?.title || '').toLowerCase();
+        const body = String(post?.body || '').toLowerCase();
+        const authorName = String(post?.authorName || post?.author?.name || '').toLowerCase();
+        const authorUsername = String(post?.authorUsername || post?.author?.username || '').toLowerCase();
+        const hashtags = Array.isArray(post?.hashtags)
+            ? post.hashtags.map((tag) => String(tag || '').toLowerCase()).join(' ')
+            : '';
+
+        return title.includes(normalizedQuery)
+            || body.includes(normalizedQuery)
+            || authorName.includes(normalizedQuery)
+            || authorUsername.includes(normalizedQuery)
+            || hashtags.includes(normalizedQuery);
+    });
+}
+
 export default function Home({
     query,
     searching,
@@ -120,13 +141,14 @@ export default function Home({
     setPanelPosts
 }) {
     const navigate = useNavigate();
-    const reduced = useReducedMotion();
     const { user, isAdmin } = useAuth();
-    const { isUserOnline, onlineUsers } = useSocketContext();
+    const { isUserOnline } = useSocketContext();
     const currentUserId = String(user?.userId || '');
     const sentinelRef = useRef(null);
     const commentsCacheRef = useRef({});
     const postsCacheRef = useRef([]);
+    const searchFallbackTimerRef = useRef(null);
+    const activeSearchQueryRef = useRef('');
 
     const [posts, setPosts] = useState([]);
     const [searchResults, setSearchResults] = useState([]);
@@ -286,7 +308,14 @@ export default function Home({
     useEffect(() => {
         const normalizedQuery = debouncedQuery.trim();
 
-        if (!normalizedQuery || normalizedQuery.length < 3) {
+        if (searchFallbackTimerRef.current) {
+            clearTimeout(searchFallbackTimerRef.current);
+            searchFallbackTimerRef.current = null;
+        }
+
+        activeSearchQueryRef.current = normalizedQuery;
+
+        if (!normalizedQuery) {
             setPage(1);
             setSearchResults([]);
             setSearching(false);
@@ -295,9 +324,45 @@ export default function Home({
             return () => controller.abort();
         }
 
+        if (normalizedQuery.length < 3) {
+            const localMatches = filterPostsByQuery(postsCacheRef.current, normalizedQuery);
+            setSearchResults(dedupePosts(localMatches));
+            setSearching(false);
+            return undefined;
+        }
+
         setSearching(true);
+        searchFallbackTimerRef.current = window.setTimeout(async () => {
+            if (activeSearchQueryRef.current !== normalizedQuery) {
+                return;
+            }
+
+            try {
+                const fallbackResults = await searchPosts(normalizedQuery);
+                if (activeSearchQueryRef.current !== normalizedQuery) {
+                    return;
+                }
+
+                const incoming = dedupePosts(fallbackResults);
+                setSearchResults(incoming);
+                await hydrateCommentsCount(incoming);
+            } catch (_error) {
+                // Keep silent; websocket search may still resolve.
+            } finally {
+                if (activeSearchQueryRef.current === normalizedQuery) {
+                    setSearching(false);
+                }
+            }
+        }, 850);
+
         emitSearch(normalizedQuery, 300);
-    }, [debouncedQuery, loadPosts, setSearching]);
+        return () => {
+            if (searchFallbackTimerRef.current) {
+                clearTimeout(searchFallbackTimerRef.current);
+                searchFallbackTimerRef.current = null;
+            }
+        };
+    }, [debouncedQuery, hydrateCommentsCount, loadPosts, setSearching]);
 
     useEffect(() => {
         if (debouncedQuery.trim() || !hasMore || loading || isLoadingMore) {
@@ -332,6 +397,16 @@ export default function Home({
 
     useEffect(() => {
         const stopResults = onSearchResults(async (payload) => {
+            const payloadQuery = String(payload?.query || '').trim();
+            if (payloadQuery && payloadQuery !== activeSearchQueryRef.current) {
+                return;
+            }
+
+            if (searchFallbackTimerRef.current) {
+                clearTimeout(searchFallbackTimerRef.current);
+                searchFallbackTimerRef.current = null;
+            }
+
             const incoming = dedupePosts(payload?.results);
             setSearchResults(incoming);
             setSearching(false);
@@ -377,6 +452,13 @@ export default function Home({
             stopNewPost();
         };
     }, [currentUserId, debouncedQuery, hydrateCommentsCount, selectedHashtag, selectedUser, setSearching]);
+
+    useEffect(() => () => {
+        if (searchFallbackTimerRef.current) {
+            clearTimeout(searchFallbackTimerRef.current);
+            searchFallbackTimerRef.current = null;
+        }
+    }, []);
 
     const visiblePosts = useMemo(() => {
         const base = debouncedQuery.trim() ? searchResults : posts;
@@ -516,109 +598,130 @@ export default function Home({
     }, [composerImagePreview]);
 
     return (
-        <div className="bg-[#f0ede8] min-h-screen">
-            {/* Topbar */}
-            <nav className="bg-white border-b border-[0.5px] border-[#ddd] sticky top-0 z-40 px-4 h-[72px] flex items-center gap-4">
-                <div className="font-semibold text-lg text-[#111]">
-                    Post<span className="text-[#e63946]">.</span>
+        <section className="space-y-3 pb-6">
+            <div className="flex gap-2.5 rounded-lg border-[0.5px] border-[var(--border-light)] bg-[var(--bg-card)] p-3 sm:gap-3 sm:p-4">
+                <div
+                    className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white sm:h-10 sm:w-10"
+                    style={{ backgroundColor: ['#5c6bc0', '#7b1fa2', '#00695c', '#ef6c00', '#d32f2f'][Number(user?.userId || 0) % 5] }}
+                >
+                    {user?.username?.charAt(0).toUpperCase() || 'U'}
                 </div>
                 <input
                     type="text"
+                    onClick={() => setComposerOpen(true)}
+                    placeholder="What's on your mind?"
                     readOnly
-                    placeholder="Search people, posts, topics..."
-                    className="flex-1 bg-[#f3f3f3] border-none rounded-full px-4 py-2 text-[13px] text-[#555] placeholder-[#999]"
+                    className="flex-1 cursor-pointer rounded-full border-none bg-[var(--bg-card-soft)] px-3 py-2 text-[12px] text-[var(--text-secondary)] placeholder:text-[var(--text-tertiary)] sm:px-4 sm:text-[13px]"
                 />
-                <div className="flex items-center gap-2 ml-auto">
-                    <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100">🏠</button>
-                    <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100">👥</button>
-                    <button className="relative w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100">
-                        🔔
-                        <div className="absolute top-2 right-2 w-2 h-2 bg-[#e63946] rounded-full" />
+                <div className="hidden items-center gap-2 sm:flex">
+                    <button type="button" onClick={() => setComposerOpen(true)} className="flex items-center gap-1 rounded-full border border-[var(--border-soft)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)] hover:bg-gray-50 dark:hover:bg-white/5">
+                        📷 Photo
                     </button>
-                    <button className="w-9 h-9 rounded-full flex items-center justify-center hover:bg-gray-100">💬</button>
-                    <div className="w-9 h-9 rounded-full bg-[#5c6bc0] flex items-center justify-center text-white text-xs font-semibold">
-                        {user?.username?.charAt(0).toUpperCase() || 'U'}
-                    </div>
+                    <button
+                        onClick={() => setComposerOpen(true)}
+                        className="bg-[#e63946] text-white border-none px-4 py-1.5 rounded-full text-[12px] font-semibold hover:bg-red-600"
+                    >
+                        Post
+                    </button>
                 </div>
-            </nav>
-
-            {/* Main Layout */}
-            <div className="flex max-w-7xl mx-auto px-4 py-3 gap-3">
-                {/* Left Sidebar */}
-                <LeftSidebar />
-
-                {/* Center Feed */}
-                <div className="flex-1 min-w-0">
-                    {/* Composer */}
-                    <div className="bg-white rounded-lg border-[0.5px] border-[#e8e8e8] p-4 mb-3 flex gap-3">
-                        <div
-                            className="flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center text-white text-xs font-semibold"
-                            style={{ backgroundColor: '#5c6bc0' }}
-                        >
-                            {user?.username?.charAt(0).toUpperCase() || 'U'}
-                        </div>
-                        <input
-                            type="text"
-                            onClick={() => setComposerOpen(true)}
-                            placeholder="What's on your mind?"
-                            readOnly
-                            className="flex-1 bg-[#f5f5f5] border-none rounded-full px-4 py-2 text-[13px] text-[#888] placeholder-[#999] cursor-pointer"
-                        />
-                        <div className="flex items-center gap-2">
-                            <button className="flex items-center gap-1 border border-[#ddd] px-3 py-1.5 rounded-full text-[12px] text-[#555] hover:bg-gray-50">
-                                📷 Photo
-                            </button>
-                            <button
-                                onClick={() => setComposerOpen(true)}
-                                className="bg-[#e63946] text-white border-none px-4 py-1.5 rounded-full text-[12px] font-semibold hover:bg-red-600"
-                            >
-                                Post
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Posts Feed */}
-                    {error && <div className="rounded-lg bg-red-50 border border-red-200 p-4 text-red-700 mb-3">{error}</div>}
-
-                    {loading ? (
-                        <Loader count={4} />
-                    ) : visiblePosts.length === 0 ? (
-                        <EmptyState />
-                    ) : (
-                        <motion.div
-                            className="space-y-3"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                        >
-                            <AnimatePresence>
-                                {visiblePosts.map((post, index) => (
-                                    <PostCard
-                                        key={post.postId}
-                                        index={index}
-                                        post={post}
-                                        query={debouncedQuery}
-                                        onToggleLike={handleLikeToggle}
-                                        isLiking={likingIds.has(post.postId)}
-                                        onOpenPreview={handleOpenPreview}
-                                        onOpenDetails={() => handleOpenDetails(post.postId)}
-                                        canDelete={isAdmin || String(post.userId) === String(user?.userId)}
-                                        isOwnPost={String(post.userId) === String(user?.userId)}
-                                        onDelete={handleDeletePost}
-                                        onTagClick={(tag) => navigate(`/hashtags/${String(tag || '').toLowerCase()}`)}
-                                        isLive={Boolean(livePulseIds[post.postId])}
-                                    />
-                                ))}
-                            </AnimatePresence>
-                        </motion.div>
-                    )}
-
-                    {!debouncedQuery.trim() && <div ref={sentinelRef} className="h-8 w-full" aria-hidden="true" />}
-                    {!debouncedQuery.trim() && isLoadingMore && <Loader count={2} />}
-                </div>
-
-                {/* Right Sidebar */}
-                <RightPanel users={users} posts={visiblePosts} />
             </div>
+
+            <div className="flex gap-2 sm:hidden">
+                <button
+                    type="button"
+                    onClick={() => setComposerOpen(true)}
+                    className="flex-1 rounded-full border border-[var(--border-soft)] px-3 py-2 text-[12px] font-semibold text-[var(--text-secondary)] hover:bg-gray-50 dark:hover:bg-white/5"
+                >
+                    Photo
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setComposerOpen(true)}
+                    className="flex-1 rounded-full bg-[#e63946] px-3 py-2 text-[12px] font-semibold text-white hover:bg-red-600"
+                >
+                    Post
+                </button>
+            </div>
+
+            {selectedHashtag && (
+                <div className="inline-flex items-center gap-2 rounded-full border border-[var(--accent-red)]/40 bg-[var(--bg-card)] px-3 py-1 text-[11px] font-semibold tracking-wide text-[var(--accent-red)]">
+                    #{selectedHashtag}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setSelectedHashtag('');
+                            if (forcedHashtag) {
+                                navigate('/explore');
+                            }
+                        }}
+                        className="text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    >
+                        Clear
+                    </button>
+                </div>
+            )}
+
+            <p className="sr-only" aria-live="polite">
+                {searching ? 'Searching posts' : `Showing ${visiblePosts.length} ${visiblePosts.length === 1 ? 'post' : 'posts'}`}
+            </p>
+
+            {error && <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-700/40 dark:bg-red-950/30 dark:text-red-300">{error}</div>}
+
+            {loading ? (
+                <Loader count={4} />
+            ) : visiblePosts.length === 0 ? (
+                <EmptyState />
+            ) : (
+                <motion.div className="space-y-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <AnimatePresence>
+                        {visiblePosts.map((post, index) => (
+                            <PostCard
+                                key={post.postId}
+                                index={index}
+                                post={post}
+                                query={debouncedQuery}
+                                onToggleLike={handleLikeToggle}
+                                isLiking={likingIds.has(post.postId)}
+                                onOpenPreview={handleOpenPreview}
+                                onOpenDetails={() => handleOpenDetails(post.postId)}
+                                canDelete={isAdmin || String(post.userId) === String(user?.userId)}
+                                isOwnPost={String(post.userId) === String(user?.userId)}
+                                onDelete={handleDeletePost}
+                                onOpenComments={() => handleOpenDetails(post.postId)}
+                                onRepost={async (targetPost) => {
+                                    const url = `${window.location.origin}/posts/${targetPost.postId}`;
+                                    if (navigator?.clipboard?.writeText) {
+                                        await navigator.clipboard.writeText(url);
+                                    }
+                                    toast.success('Post link copied for repost');
+                                }}
+                                onShare={async (targetPost) => {
+                                    const url = `${window.location.origin}/posts/${targetPost.postId}`;
+                                    if (navigator?.share) {
+                                        try {
+                                            await navigator.share({ title: targetPost?.title || 'Post', text: targetPost?.body || '', url });
+                                            return;
+                                        } catch (_error) {
+                                            // Fallback to clipboard.
+                                        }
+                                    }
+
+                                    if (navigator?.clipboard?.writeText) {
+                                        await navigator.clipboard.writeText(url);
+                                    }
+                                    toast.success('Post link copied');
+                                }}
+                                onFollowUser={(targetPost) => navigate(`/profile/${targetPost.userId}`)}
+                                onTagClick={(tag) => navigate(`/hashtags/${String(tag || '').toLowerCase()}`)}
+                                isLive={Boolean(livePulseIds[post.postId])}
+                            />
+                        ))}
+                    </AnimatePresence>
+                </motion.div>
+            )}
+
+            {!debouncedQuery.trim() && <div ref={sentinelRef} className="h-8 w-full" aria-hidden="true" />}
+            {!debouncedQuery.trim() && isLoadingMore && <Loader count={2} />}
 
             {/* Post Modal */}
             <PostModal
@@ -649,32 +752,32 @@ export default function Home({
                             initial={{ opacity: 0, y: 24 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: 12 }}
-                            className="fixed inset-0 z-[92] grid place-items-center p-4"
+                            className="fixed inset-0 z-[92] grid place-items-center p-3 sm:p-4"
                         >
-                            <div className="bg-white rounded-lg w-full max-w-xl border border-[#e8e8e8] p-6">
-                                <h3 className="text-2xl font-semibold text-[#111] mb-2">Create Post</h3>
-                                <p className="text-[13px] text-[#999] mb-4">Share your thoughts with the community</p>
+                            <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-lg border border-[var(--border-light)] bg-[var(--bg-card)] p-4 sm:p-6">
+                                <h3 className="mb-2 text-xl font-semibold text-[var(--text-primary)] sm:text-2xl">Create Post</h3>
+                                <p className="mb-4 text-[13px] text-[var(--text-tertiary)]">Share your thoughts with the community</p>
 
                                 <div className="space-y-3">
                                     <input
                                         value={composer.title}
                                         onChange={(event) => setComposer((prev) => ({ ...prev, title: event.target.value }))}
                                         placeholder="Title"
-                                        className="w-full rounded-lg border border-[#e8e8e8] px-4 py-2 text-sm font-semibold text-[#111] focus:border-[#e63946] focus:outline-none"
+                                        className="w-full rounded-lg border border-[var(--border-light)] bg-transparent px-4 py-2 text-sm font-semibold text-[var(--text-primary)] focus:border-[var(--accent-red)] focus:outline-none"
                                     />
                                     <textarea
                                         value={composer.body}
                                         onChange={(event) => setComposer((prev) => ({ ...prev, body: event.target.value }))}
                                         placeholder="Write your post body..."
-                                        rows={6}
-                                        className="w-full rounded-lg border border-[#e8e8e8] px-4 py-2 text-[13px] text-[#333] focus:border-[#e63946] focus:outline-none"
+                                        rows={5}
+                                        className="w-full rounded-lg border border-[var(--border-light)] bg-transparent px-4 py-2 text-[13px] text-[var(--text-secondary)] focus:border-[var(--accent-red)] focus:outline-none"
                                     />
 
                                     <input
                                         type="file"
                                         accept="image/*"
                                         onChange={handleComposerImageChange}
-                                        className="block w-full border-dashed border-2 border-[#ddd] rounded-lg p-4 text-[12px] text-[#999] file:hidden cursor-pointer hover:border-[#e63946]"
+                                        className="block w-full cursor-pointer rounded-lg border-2 border-dashed border-[var(--border-soft)] p-4 text-[12px] text-[var(--text-tertiary)] file:hidden hover:border-[var(--accent-red)]"
                                     />
 
                                     {composerImagePreview && (
@@ -686,7 +789,7 @@ export default function Home({
                                     <button
                                         type="button"
                                         onClick={() => setComposerOpen(false)}
-                                        className="px-4 py-2 rounded-full border border-[#ddd] text-[12px] font-semibold text-[#555] hover:bg-gray-50"
+                                        className="rounded-full border border-[var(--border-soft)] px-4 py-2 text-[12px] font-semibold text-[var(--text-secondary)] hover:bg-gray-50 dark:hover:bg-white/5"
                                     >
                                         Cancel
                                     </button>
@@ -703,6 +806,6 @@ export default function Home({
                     </>
                 )}
             </AnimatePresence>
-        </div>
+        </section>
     );
 }

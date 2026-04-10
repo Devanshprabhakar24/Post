@@ -1,11 +1,13 @@
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { MessageCircle, X } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import LikeButton from './LikeButton';
 import { Avatar } from './ui/avatar';
 
 export default function PostModal({ open, post, onClose, onToggleLike, liking, origin = { x: '50%', y: '50%' } }) {
     const reduced = useReducedMotion();
+    const imageRef = useRef(null);
 
     useEffect(() => {
         if (!open) {
@@ -22,11 +24,24 @@ export default function PostModal({ open, post, onClose, onToggleLike, liking, o
         return () => window.removeEventListener('keydown', onKeyDown);
     }, [onClose, open]);
 
-    return (
+    const handleImageFullscreen = async () => {
+        const element = imageRef.current;
+        if (!element || typeof element.requestFullscreen !== 'function') {
+            return;
+        }
+
+        try {
+            await element.requestFullscreen();
+        } catch (_error) {
+            // Browser may block fullscreen in some contexts.
+        }
+    };
+
+    const modalContent = (
         <AnimatePresence>
-            {open && post && (
+            {open && post ? (
                 <motion.div
-                    className="fixed inset-0 z-[95] overflow-y-auto bg-ink/85 px-4 py-8"
+                    className="fixed inset-0 z-[95] overflow-y-auto bg-black/95 px-2 py-4 sm:px-4 sm:py-8"
                     initial={
                         reduced
                             ? { opacity: 1 }
@@ -43,19 +58,19 @@ export default function PostModal({ open, post, onClose, onToggleLike, liking, o
                     aria-modal="true"
                     aria-label="Post preview"
                 >
-                    <div className="mx-auto max-w-4xl">
-                        <div className="mb-4 flex justify-end">
+                    <div className="mx-auto max-w-5xl">
+                        <div className="mb-3 flex justify-end sm:mb-4">
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="rounded-full border border-mist/45 p-2 text-mist hover:border-volt hover:text-volt"
+                                className="rounded-full border border-white/35 bg-black p-2 text-white hover:border-white/60"
                             >
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
 
-                        <article className="editorial-surface rounded-3xl p-6">
-                            <header className="mb-5 flex items-center justify-between gap-3">
+                        <article className="rounded-2xl border border-white/15 bg-[#0b0f15] p-3.5 shadow-[0_24px_80px_rgba(0,0,0,0.75)] sm:rounded-3xl sm:p-6">
+                            <header className="mb-4 flex items-center justify-between gap-3 sm:mb-5">
                                 <div className="flex items-center gap-3">
                                     <Avatar
                                         name={post.authorName || post.author?.name}
@@ -63,23 +78,32 @@ export default function PostModal({ open, post, onClose, onToggleLike, liking, o
                                         online={Boolean(post.author?.isOnline)}
                                     />
                                     <div>
-                                        <p className="font-display text-3xl text-paper">{post.authorName || post.author?.name || 'Author'}</p>
-                                        <p className="ui-font text-[10px] uppercase tracking-[0.16em] text-mist">
+                                        <p className="font-display text-2xl text-white sm:text-3xl">{post.authorName || post.author?.name || 'Author'}</p>
+                                        <p className="ui-font text-[10px] uppercase tracking-[0.16em] text-white/60">
                                             @{post.authorUsername || post.author?.username || `user-${post.userId}`}
                                         </p>
                                     </div>
                                 </div>
                             </header>
 
-                            <h2 className="font-display text-[clamp(2.2rem,5vw,4rem)] leading-[0.9] text-paper">{post.title}</h2>
-                            <p className="mt-4 whitespace-pre-line font-body text-lg italic leading-8 text-mist">{post.body}</p>
+                            <h2 className="font-display text-[clamp(1.7rem,7vw,4rem)] leading-[0.95] text-white">{post.title}</h2>
+                            <p className="mt-3 whitespace-pre-line font-body text-base italic leading-7 text-white/70 sm:mt-4 sm:text-lg sm:leading-8">{post.body}</p>
 
                             {post.imageUrl && (
-                                <img src={post.imageUrl} alt={post.title} className="mt-6 max-h-[34rem] w-full rounded-2xl object-cover" />
+                                <div className="mt-4 rounded-2xl border border-white/10 bg-black p-1.5 sm:mt-6 sm:p-2">
+                                    <button type="button" onClick={handleImageFullscreen} className="block w-full text-left" aria-label="Open image in full screen">
+                                        <img
+                                            ref={imageRef}
+                                            src={post.imageUrl}
+                                            alt={post.title}
+                                            className="max-h-[75vh] w-full cursor-zoom-in rounded-xl object-contain sm:max-h-[80vh]"
+                                        />
+                                    </button>
+                                </div>
                             )}
 
-                            <footer className="mt-6 flex items-center justify-between border-t border-mist/30 pt-4">
-                                <span className="inline-flex items-center gap-1 ui-font text-xs uppercase tracking-[0.14em] text-mist">
+                            <footer className="mt-4 flex items-center justify-between border-t border-white/15 pt-3 sm:mt-6 sm:pt-4">
+                                <span className="inline-flex items-center gap-1 ui-font text-xs uppercase tracking-[0.14em] text-white/60">
                                     <MessageCircle className="h-4 w-4" /> {post.commentsCount || 0} comments
                                 </span>
                                 <LikeButton
@@ -92,7 +116,13 @@ export default function PostModal({ open, post, onClose, onToggleLike, liking, o
                         </article>
                     </div>
                 </motion.div>
-            )}
+            ) : null}
         </AnimatePresence>
     );
+
+    if (typeof document === 'undefined') {
+        return null;
+    }
+
+    return createPortal(modalContent, document.body);
 }

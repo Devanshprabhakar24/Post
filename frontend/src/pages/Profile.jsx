@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Loader from '../components/Loader';
 import PostCard from '../components/PostCard';
@@ -8,7 +8,7 @@ import { Avatar } from '../components/ui/avatar';
 import { useAuth } from '../context/AuthContext';
 import { useSocketContext } from '../context/SocketContext';
 import useCountUp from '../hooks/useCountUp';
-import { fetchUserById, fetchUsers, followUser, unfollowUser, uploadProfilePicture } from '../services/api';
+import { fetchUserById, fetchUsers, followUser, likePost, unlikePost, unfollowUser, uploadProfilePicture } from '../services/api';
 
 function hashGradient(seed) {
     const text = String(seed || 'profile');
@@ -23,6 +23,7 @@ function hashGradient(seed) {
 }
 
 export default function Profile() {
+    const navigate = useNavigate();
     const { user, updateUser } = useAuth();
     const { isUserOnline } = useSocketContext();
     const { id: routeUserId } = useParams();
@@ -34,8 +35,14 @@ export default function Profile() {
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [selectedPhotoFile, setSelectedPhotoFile] = useState(null);
     const [photoPreview, setPhotoPreview] = useState('');
+    const hasShownFetchError = useRef(false);
 
-    const viewedUserId = Number(routeUserId || user?.userId);
+    const routeId = Number(routeUserId);
+    const authId = Number(user?.userId || user?.id);
+    const hasExplicitRouteUserId = Number.isFinite(routeId) && routeId > 0;
+    const viewedUserId = hasExplicitRouteUserId
+        ? routeId
+        : (Number.isFinite(authId) && authId > 0 ? authId : null);
     const profileUser = profileData?.user || user;
     const posts = profileData?.posts || [];
     const followersCount = profileData?.followersCount || 0;
@@ -43,6 +50,7 @@ export default function Profile() {
     const isFollowing = Boolean(profileData?.isFollowing);
     const isOwnProfile = Number(profileUser?.userId) === Number(user?.userId);
     const profileImage = photoPreview || profileUser?.profilePic || profileUser?.imageUrl || profileUser?.profilePicData || '';
+    const profileBasePath = viewedUserId ? `/profile/${viewedUserId}` : '/profile';
 
     const postsAnimated = useCountUp(posts.length);
     const followersAnimated = useCountUp(followersCount);
@@ -72,14 +80,44 @@ export default function Profile() {
         let active = true;
 
         async function load() {
+            if (!viewedUserId) {
+                if (active) {
+                    setProfileData((current) => current || {
+                        user: user || null,
+                        posts: [],
+                        followersCount: Number(user?.followersCount || user?.followers?.length || 0),
+                        followingCount: Number(user?.followingCount || user?.following?.length || 0),
+                        isFollowing: false
+                    });
+                    setLoading(false);
+                }
+                return;
+            }
+
             setLoading(true);
             try {
                 const data = await fetchUserById(viewedUserId);
                 if (active) {
                     setProfileData(data || null);
+                    hasShownFetchError.current = false;
                 }
             } catch (error) {
-                toast.error(error.message || 'Failed to load profile');
+                const isOwnProfileFallback = !hasExplicitRouteUserId;
+
+                if (!isOwnProfileFallback && !hasShownFetchError.current) {
+                    toast.error(error.message || 'Failed to load profile');
+                    hasShownFetchError.current = true;
+                }
+
+                if (active) {
+                    setProfileData((current) => current || {
+                        user: user || null,
+                        posts: [],
+                        followersCount: Number(user?.followersCount || user?.followers?.length || 0),
+                        followingCount: Number(user?.followingCount || user?.following?.length || 0),
+                        isFollowing: false
+                    });
+                }
             } finally {
                 if (active) {
                     setLoading(false);
@@ -92,7 +130,7 @@ export default function Profile() {
         return () => {
             active = false;
         };
-    }, [viewedUserId]);
+    }, [hasExplicitRouteUserId, user, viewedUserId]);
 
     const userMap = useMemo(
         () => users.reduce((acc, entry) => {
@@ -121,6 +159,57 @@ export default function Profile() {
             toast.error(error.message || 'Failed to update follow state');
         } finally {
             setUpdatingFollow(false);
+        }
+    };
+
+    const handleLikeToggle = async (targetPost) => {
+        if (!targetPost?.postId || !user?.userId) {
+            return;
+        }
+
+        const shouldLike = !targetPost?.isLiked;
+
+        setProfileData((current) => {
+            if (!current) {
+                return current;
+            }
+
+            return {
+                ...current,
+                posts: (current.posts || []).map((entry) => entry.postId === targetPost.postId
+                    ? {
+                        ...entry,
+                        isLiked: shouldLike,
+                        likes: Math.max(0, Number(entry.likes || 0) + (shouldLike ? 1 : -1))
+                    }
+                    : entry)
+            };
+        });
+
+        try {
+            if (shouldLike) {
+                await likePost(targetPost.postId, user.userId);
+            } else {
+                await unlikePost(targetPost.postId, user.userId);
+            }
+        } catch (error) {
+            toast.error(error.message || 'Failed to update like');
+            setProfileData((current) => {
+                if (!current) {
+                    return current;
+                }
+
+                return {
+                    ...current,
+                    posts: (current.posts || []).map((entry) => entry.postId === targetPost.postId
+                        ? {
+                            ...entry,
+                            isLiked: !shouldLike,
+                            likes: Math.max(0, Number(entry.likes || 0) + (shouldLike ? -1 : 1))
+                        }
+                        : entry)
+                };
+            });
         }
     };
 
@@ -192,19 +281,19 @@ export default function Profile() {
                 <div className="h-56 w-full" style={{ background: hashGradient(profileUser?.username || profileUser?.name) }} />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(200,241,53,0.22),transparent_40%)]" />
 
-                <div className="relative -mt-10 px-6 pb-6">
+                <div className="relative -mt-10 bg-[var(--bg-card)] px-6 pb-6">
                     <Avatar
                         name={profileUser?.name}
                         src={profileImage}
                         online={Boolean(profileUser?.isOnline || isUserOnline(profileUser?.userId))}
-                        className="h-24 w-24 border-4 border-volt/65"
+                        className="h-24 w-24 border-4 border-[var(--bg-card)]"
                     />
 
                     <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
                         <div>
-                            <h1 className="font-display text-[clamp(3rem,8vw,4.4rem)] leading-[0.9] text-paper">{profileUser?.name || 'Profile'}</h1>
-                            <p className="ui-font text-xs uppercase tracking-[0.18em] text-mist">@{profileUser?.username || profileUser?.email}</p>
-                            <p className="mt-3 max-w-2xl font-body text-xl italic text-mist">{profileUser?.bio || 'No bio yet.'}</p>
+                            <h1 className="font-display text-[clamp(3rem,8vw,4.4rem)] leading-[0.9] text-[var(--text-primary)]">{profileUser?.name || 'Profile'}</h1>
+                            <p className="ui-font text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)]">@{profileUser?.username || profileUser?.email}</p>
+                            <p className="mt-3 max-w-2xl font-body text-xl italic text-[var(--text-secondary)]">{profileUser?.bio || 'No bio yet.'}</p>
                         </div>
 
                         <div className="flex flex-wrap gap-2">
@@ -241,18 +330,18 @@ export default function Profile() {
                     </div>
 
                     <div className="mt-5 grid max-w-xl gap-2 sm:grid-cols-3">
-                        <div className="rounded-xl border border-mist/30 p-3">
-                            <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-mist">Posts</p>
-                            <p className="font-display text-4xl text-paper">{postsAnimated}</p>
+                        <div className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-card-soft)] p-3">
+                            <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-[var(--text-secondary)]">Posts</p>
+                            <p className="font-display text-4xl text-[var(--text-primary)]">{postsAnimated}</p>
                         </div>
-                        <div className="rounded-xl border border-mist/30 p-3">
-                            <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-mist">Followers</p>
-                            <p className="font-display text-4xl text-paper">{followersAnimated}</p>
-                        </div>
-                        <div className="rounded-xl border border-mist/30 p-3">
-                            <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-mist">Following</p>
-                            <p className="font-display text-4xl text-paper">{followingAnimated}</p>
-                        </div>
+                        <Link to={`${profileBasePath}/followers`} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-card-soft)] p-3 transition hover:border-[var(--accent-red)]/50">
+                            <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-[var(--text-secondary)]">Followers</p>
+                            <p className="font-display text-4xl text-[var(--text-primary)]">{followersAnimated}</p>
+                        </Link>
+                        <Link to={`${profileBasePath}/following`} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-card-soft)] p-3 transition hover:border-[var(--accent-red)]/50">
+                            <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-[var(--text-secondary)]">Following</p>
+                            <p className="font-display text-4xl text-[var(--text-primary)]">{followingAnimated}</p>
+                        </Link>
                     </div>
                 </div>
             </div>
@@ -267,14 +356,16 @@ export default function Profile() {
                             post={{
                                 ...post,
                                 author: userMap[post.userId] || post.author,
-                                isLiked: false,
+                                isLiked: Boolean(post?.isLiked),
                                 commentsCount: post.commentsCount || 0
                             }}
                             index={index}
-                            onToggleLike={() => {}}
-                            onOpenPreview={() => {}}
-                            onOpenDetails={() => {}}
-                            onTagClick={() => {}}
+                            onToggleLike={handleLikeToggle}
+                            onOpenPreview={(targetPost) => navigate(`/posts/${targetPost.postId}`)}
+                            onOpenDetails={(targetPost) => navigate(`/posts/${targetPost.postId}`)}
+                            onOpenComments={(targetPost) => navigate(`/posts/${targetPost.postId}`)}
+                            onTagClick={(tag) => navigate(`/hashtags/${String(tag || '').toLowerCase()}`)}
+                            onFollowUser={(targetPost) => navigate(`/profile/${targetPost.userId}`)}
                         />
                     ))
                 )}
