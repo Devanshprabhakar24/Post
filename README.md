@@ -2,7 +2,7 @@
 
 A modern, full-stack social media application with real-time updates, user authentication, follow system, and live notifications. Built with React 19, Vite, Node.js/Express, and MongoDB.
 
-**Live Demo**: [Deployed on Vercel + Render](https://post-explorer.vercel.app)
+**Live Demo**: [Deployed on Vercel + Render](https://post-peach-three.vercel.app)
 
 ## ✨ Features
 
