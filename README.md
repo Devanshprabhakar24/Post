@@ -235,13 +235,204 @@ App runs on `http://localhost:5173`
 
 ## 🔐 Authentication
 
-Requests require JWT token in header:
+### Registration Flow
+
+```
+User Registration Process:
+1. Navigate to /register
+2. Enter username, email, password
+3. Frontend validates:
+   ✓ Username: 3+ characters, unique
+   ✓ Email: valid format, unique
+   ✓ Password: 6+ characters
+4. POST /api/auth/register
+5. Backend processes:
+   ├─ Hash password with bcrypt
+   ├─ Create user in MongoDB
+   ├─ Generate JWT token
+   └─ Return token + user data
+6. Frontend stores token in localStorage
+7. Redirect to /home (authenticated)
+```
+
+### Login Flow
+
+```
+User Login Process:
+1. Navigate to /login
+2. Enter email and password
+3. POST /api/auth/login
+4. Backend validates:
+   ├─ Find user by email
+   ├─ Compare password with bcrypt
+   ├─ If valid, generate JWT
+   └─ Return token + user data
+5. Frontend receives token
+6. Store in localStorage
+7. Axios interceptor adds to all requests
+8. Redirect to /home (authenticated)
+```
+
+### JWT Token Lifecycle
+
+```
+Token Structure:
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
+Token Contents:
+├─ Header: Algorithm (HS256)
+├─ Payload: { userId, iat, exp }
+├─ Signature: Verified with JWT_SECRET
+└─ Expires: 7 days from creation
+
+Token Validation:
+1. Every protected request includes token
+2. Backend verifies signature
+3. Checks expiration date
+4. Extracts userId for authorization
+5. Invalid/expired → 401 Unauthorized
+```
+
+### Authentication Requests
+
+**All API calls automatically include token:**
 
 ```
 Authorization: Bearer <token>
 ```
 
-Token is stored in `localStorage` and automatically attached by Axios interceptor.
+**Token is:**
+
+- Stored in `localStorage` → persists across tabs/refresh
+- Attached by Axios interceptor to all requests
+- Removed on logout
+- Never exposed in cookies (CSRF protection)
+
+**Protected Routes:**
+
+- All `/api/*` endpoints except `/api/auth/register` and `/api/auth/login`
+- Frontend guards routes (redirects to /login if no token)
+- Backend validates token on every request
+
+### Frontend Implementation
+
+**Login/Register Pages** (`src/pages/Login.jsx`, `src/pages/Register.jsx`):
+
+```javascript
+// User types credentials
+const handleRegister = async (username, email, password) => {
+  const response = await axios.post("/api/auth/register", {
+    username,
+    email,
+    password,
+  });
+
+  // Store token
+  localStorage.setItem("token", response.data.token);
+
+  // Redirect to home
+  navigate("/home");
+};
+```
+
+**Axios Interceptor** (`src/services/api.js`):
+
+```javascript
+// Every request automatically includes token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Handle unauthorized responses
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token expired or invalid
+      localStorage.removeItem("token");
+      window.location.href = "/login";
+    }
+    return Promise.reject(error);
+  },
+);
+```
+
+**Auth Context** (`src/context/AuthContext.jsx`):
+
+```javascript
+const AuthContext = createContext();
+
+export function AuthProvider({ children }) {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Check if token exists on mount
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      // Verify token is still valid
+      api
+        .get("/api/users/profile")
+        .then((res) => setCurrentUser(res.data))
+        .catch(() => localStorage.removeItem("token"))
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const login = async (email, password) => {
+    const res = await api.post("/api/auth/login", { email, password });
+    localStorage.setItem("token", res.data.token);
+    setCurrentUser(res.data.user);
+    return res.data;
+  };
+
+  const logout = () => {
+    localStorage.removeItem("token");
+    setCurrentUser(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ currentUser, login, logout, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+```
+
+**Protected Route** (`src/components/ProtectedRoute.jsx`):
+
+```javascript
+function ProtectedRoute({ children }) {
+  const { currentUser, loading } = useAuth();
+
+  if (loading) return <Skeleton />;
+
+  if (!currentUser) {
+    return <Navigate to="/login" />;
+  }
+
+  return children;
+}
+
+// Usage
+<Routes>
+  <Route path="/login" element={<Login />} />
+  <Route
+    path="/home"
+    element={
+      <ProtectedRoute>
+        <Home />
+      </ProtectedRoute>
+    }
+  />
+</Routes>;
+```
 
 ## 🎨 Project Highlights
 
