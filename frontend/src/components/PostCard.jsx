@@ -85,9 +85,11 @@ function PostCard({
     
     const timeAgo = useMemo(() => {
         if (!post?.createdAt) return 'recently';
-        const diff = Date.now() - new Date(post.createdAt).getTime();
+        const timestamp = new Date(post.createdAt).getTime();
+        if (!Number.isFinite(timestamp)) return 'recently';
+        const diff = Date.now() - timestamp;
         const hours = Math.floor(diff / (1000 * 60 * 60));
-        if (hours < 1) return 'minutes ago';
+        if (hours < 1) return 'just now';
         if (hours < 24) return `${hours}h ago`;
         return `${Math.floor(hours / 24)}d ago`;
     }, [post?.createdAt]);

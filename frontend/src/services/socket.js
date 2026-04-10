@@ -31,11 +31,39 @@ const SOCKET_OPTIONS = import.meta.env.DEV
         autoConnect: false
     };
 
-const socket = io(`${SOCKET_URL}/feed`, SOCKET_OPTIONS);
-const searchSocket = io(`${SOCKET_URL}/search`, SOCKET_OPTIONS);
-const presenceSocket = io(`${SOCKET_URL}/presence`, SOCKET_OPTIONS);
+let socket = io(`${SOCKET_URL}/feed`, SOCKET_OPTIONS);
+let searchSocket = io(`${SOCKET_URL}/search`, SOCKET_OPTIONS);
+let presenceSocket = io(`${SOCKET_URL}/presence`, SOCKET_OPTIONS);
+
+function createFeedSocket() {
+    return io(`${SOCKET_URL}/feed`, SOCKET_OPTIONS);
+}
+
+function createSearchSocket() {
+    return io(`${SOCKET_URL}/search`, SOCKET_OPTIONS);
+}
+
+function createPresenceSocket() {
+    return io(`${SOCKET_URL}/presence`, SOCKET_OPTIONS);
+}
+
+function ensureSockets() {
+    if (!socket) {
+        socket = createFeedSocket();
+    }
+
+    if (!searchSocket) {
+        searchSocket = createSearchSocket();
+    }
+
+    if (!presenceSocket) {
+        presenceSocket = createPresenceSocket();
+    }
+}
 
 function connectSocket() {
+    ensureSockets();
+
     if (!socket.connected) {
         socket.connect();
     }
@@ -50,50 +78,73 @@ function connectSocket() {
 }
 
 function onSearchResults(handler) {
+    ensureSockets();
     searchSocket.on('results', handler);
     return () => searchSocket.off('results', handler);
 }
 
 function emitSearch(query, debounceMs = 300) {
+    ensureSockets();
     searchSocket.emit('search', { query, debounceMs });
 }
 
 function onLikeUpdated(handler) {
+    ensureSockets();
     socket.on('likeUpdated', handler);
     return () => socket.off('likeUpdated', handler);
 }
 
 function onNewPost(handler) {
+    ensureSockets();
     socket.on('newPost', handler);
     return () => socket.off('newPost', handler);
 }
 
 function onUserOnline(handler) {
+    ensureSockets();
     presenceSocket.on('userOnline', handler);
     return () => presenceSocket.off('userOnline', handler);
 }
 
 function onUserOffline(handler) {
+    ensureSockets();
     presenceSocket.on('userOffline', handler);
     return () => presenceSocket.off('userOffline', handler);
 }
 
 function identifyUser(userId) {
+    ensureSockets();
     socket.emit('identify', { userId });
     presenceSocket.emit('identify', { userId });
 }
 
 function joinPost(postId) {
+    ensureSockets();
     socket.emit('joinPost', postId);
 }
 
 function disconnectSocket() {
-    socket.disconnect();
-    searchSocket.disconnect();
-    presenceSocket.disconnect();
+    if (socket) {
+        socket.removeAllListeners();
+        socket.disconnect();
+        socket = null;
+    }
+
+    if (searchSocket) {
+        searchSocket.removeAllListeners();
+        searchSocket.disconnect();
+        searchSocket = null;
+    }
+
+    if (presenceSocket) {
+        presenceSocket.removeAllListeners();
+        presenceSocket.disconnect();
+        presenceSocket = null;
+    }
 }
 
 function onNotification(handler) {
+    ensureSockets();
     socket.on('notification', handler);
     return () => socket.off('notification', handler);
 }

@@ -129,7 +129,15 @@ function clear(key) {
     }
 
     redis.keys(`${KEY_PREFIX}:*`)
-        .then((keys) => (keys.length ? redis.del(...keys) : null))
+        .then((keys) => {
+            if (!keys.length) {
+                return null;
+            }
+
+            const pipeline = redis.pipeline();
+            keys.forEach((entry) => pipeline.del(entry));
+            return pipeline.exec();
+        })
         .catch(() => {
             localClear();
         });

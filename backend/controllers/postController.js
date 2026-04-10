@@ -328,7 +328,7 @@ async function fetchAndStoreData(_req, res) {
 async function createPost(req, res) {
     try {
         const authUserId = getAuthUserId(req);
-        const { title, body, imageUrl, image } = req.body || {};
+        const { title, body, imageUrl, image, hashtags: explicitHashtags = [] } = req.body || {};
         const normalizedTitle = String(title || '').trim();
         const normalizedBody = String(body || '').trim();
 
@@ -362,7 +362,11 @@ async function createPost(req, res) {
 
         const maxPost = await Post.findOne().sort({ postId: -1 }).select({ postId: 1 }).lean();
         const nextPostId = Number(maxPost?.postId || 0) + 1;
-        const hashtags = extractHashtags([normalizedTitle, normalizedBody]);
+        const bodyHashtags = extractHashtags([normalizedTitle, normalizedBody]);
+        const explicitHashtagList = Array.isArray(explicitHashtags)
+            ? explicitHashtags.map((tag) => normalizeHashtag(tag)).filter(Boolean)
+            : [];
+        const hashtags = Array.from(new Set([...bodyHashtags, ...explicitHashtagList]));
         let resolvedImageUrl = String(imageUrl || image || '').trim();
         let resolvedImageData = '';
         let resolvedImageContentType = '';

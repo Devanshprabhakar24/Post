@@ -53,7 +53,22 @@ const searchLimiter = rateLimit({
     }
 });
 
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: isProduction ? 10 : 100,
+    store: createStore('rl:auth:'),
+    standardHeaders: true,
+    legacyHeaders: false,
+    passOnStoreError: true,
+    message: {
+        success: false,
+        data: null,
+        message: 'Too many auth attempts, please slow down'
+    }
+});
+
 module.exports = {
     globalLimiter,
-    searchLimiter
+    searchLimiter,
+    authLimiter
 };

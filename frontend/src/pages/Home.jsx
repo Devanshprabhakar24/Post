@@ -76,9 +76,10 @@ function applyLikeToList(list, postId, userId, shouldLike) {
         }
 
         const currentLikedBy = Array.isArray(item.likedBy) ? item.likedBy : [];
+        const normalizedUserId = Number(userId);
         const nextLikedBy = shouldLike
-            ? Array.from(new Set([...currentLikedBy, userId]))
-            : currentLikedBy.filter((entry) => entry !== userId);
+            ? Array.from(new Set([...currentLikedBy, normalizedUserId]))
+            : currentLikedBy.filter((entry) => Number(entry) !== normalizedUserId);
 
         return {
             ...item,
@@ -143,7 +144,7 @@ export default function Home({
     const navigate = useNavigate();
     const { user, isAdmin } = useAuth();
     const { isUserOnline } = useSocketContext();
-    const currentUserId = String(user?.userId || '');
+    const currentUserId = Number(user?.userId || 0);
     const sentinelRef = useRef(null);
     const commentsCacheRef = useRef({});
     const postsCacheRef = useRef([]);

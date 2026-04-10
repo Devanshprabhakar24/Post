@@ -33,6 +33,12 @@ const userSchema = new mongoose.Schema(
             trim: true,
             lowercase: true
         },
+        role: {
+            type: String,
+            trim: true,
+            default: 'user',
+            index: true
+        },
         password: {
             type: String,
             select: false

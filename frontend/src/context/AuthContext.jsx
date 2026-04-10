@@ -30,27 +30,58 @@ function parseStoredUser() {
             return null;
         }
 
+        const storedUser = { ...parsed };
+        delete storedUser.profilePicData;
+
         return {
-            ...parsed,
-            role: deriveRole(parsed)
+            ...storedUser,
+            role: deriveRole(storedUser)
         };
     } catch (_error) {
         return null;
     }
 }
 
+function isTokenValid(token) {
+    if (!token) {
+        return false;
+    }
+
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1] || ''));
+        if (!payload?.exp) {
+            return true;
+        }
+
+        return payload.exp * 1000 > Date.now();
+    } catch (_error) {
+        return false;
+    }
+}
+
 export function AuthProvider({ children }) {
-    const [token, setToken] = useState(() => localStorage.getItem(AUTH_TOKEN_KEY) || '');
+    const [token, setToken] = useState(() => {
+        const stored = localStorage.getItem(AUTH_TOKEN_KEY) || '';
+        return isTokenValid(stored) ? stored : '';
+    });
     const [user, setUser] = useState(parseStoredUser);
 
     const isAuthenticated = Boolean(token);
 
-    const setSession = (nextToken, nextUser) => {
+    const setSession = useCallback((nextToken, nextUser) => {
         const normalizedUser = nextUser
             ? {
                   ...nextUser,
                   role: deriveRole(nextUser)
               }
+            : null;
+
+        const userToStore = normalizedUser
+            ? (() => {
+                  const clone = { ...normalizedUser };
+                  delete clone.profilePicData;
+                  return clone;
+              })()
             : null;
 
         if (nextToken) {
@@ -61,14 +92,14 @@ export function AuthProvider({ children }) {
             setToken('');
         }
 
-        if (normalizedUser) {
-            localStorage.setItem(AUTH_USER_KEY, JSON.stringify(normalizedUser));
-            setUser(normalizedUser);
+        if (userToStore) {
+            localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userToStore));
+            setUser(userToStore);
         } else {
             localStorage.removeItem(AUTH_USER_KEY);
             setUser(null);
         }
-    };
+    }, []);
 
     const login = useCallback(async (payload) => {
         const data = await loginUser(payload);

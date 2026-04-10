@@ -237,9 +237,10 @@ async function bootstrap() {
             }
 
             cronTask.stop();
+            await likeFlushJob.flush();
             likeFlushJob.stop();
             await stopUploadWorker();
-            io.close();
+            await new Promise((resolve) => io.close(resolve));
             await disconnectDatabase();
             process.exit(1);
         });
@@ -278,13 +279,13 @@ async function bootstrap() {
             });
 
             cronTask.stop();
-            likeFlushJob.stop();
             await likeFlushJob.flush();
+            likeFlushJob.stop();
             await stopUploadWorker();
-            await io.close();
+            await new Promise((resolve) => io.close(resolve));
 
-            const redis = ensureRedisClient ? await ensureRedisClient() : null;
-            if (redis) {
+            const redis = await ensureRedisClient();
+            if (redis && redis.status === 'ready') {
                 await redis.quit();
             }
 

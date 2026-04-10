@@ -290,6 +290,17 @@ export default function App() {
     }, [theme]);
 
     useEffect(() => {
+        const onStorage = (event) => {
+            if (event.key === THEME_KEY && (event.newValue === 'light' || event.newValue === 'dark')) {
+                setTheme(event.newValue);
+            }
+        };
+
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
+    }, []);
+
+    useEffect(() => {
         const onKeyDown = (event) => {
             if (event.key === '/' && document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
                 searchInputRef.current?.focus();

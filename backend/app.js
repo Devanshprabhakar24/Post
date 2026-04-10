@@ -86,6 +86,10 @@ function createApp() {
             req.params = mongoSanitize.sanitize(req.params);
         }
 
+        if (req.query && typeof req.query === 'object') {
+            req.query = mongoSanitize.sanitize(req.query);
+        }
+
         next();
     });
     app.use(compression());

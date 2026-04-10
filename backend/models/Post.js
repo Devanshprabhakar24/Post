@@ -73,6 +73,7 @@ const postSchema = new mongoose.Schema(
 // Text index for full-text search
 postSchema.index({ title: 'text', body: 'text' });
 postSchema.index({ userId: 1, createdAt: -1 });
+postSchema.index({ userId: 1, isExternal: 1, createdAt: -1 });
 postSchema.index({ isExternal: 1, createdAt: -1 });
 postSchema.index({ hashtags: 1, createdAt: -1 });
 postSchema.index({ createdAt: -1 });

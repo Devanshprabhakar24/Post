@@ -7,6 +7,8 @@ const CLOUDINARY_UPLOAD_PRESET = String(process.env.CLOUDINARY_UPLOAD_PRESET || 
 const LOCAL_UPLOAD_ROOT = path.join(__dirname, '..', 'uploads');
 const LOCAL_MEDIA_BASE_URL = String(process.env.PUBLIC_MEDIA_URL || `http://localhost:${process.env.PORT || 8000}`).replace(/\/$/, '');
 
+const ALLOWED_IMAGE_SIGNATURES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
 function ensureCloudinaryConfigured() {
     if (!hasCloudinaryConfig()) {
         const error = new Error('Cloudinary is not configured');
@@ -64,6 +66,46 @@ function getExtensionFromMimeType(mimeType) {
     }
 }
 
+function getDetectedMimeType(buffer) {
+    if (!Buffer.isBuffer(buffer) || buffer.length < 12) {
+        return null;
+    }
+
+    if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+        return 'image/jpeg';
+    }
+
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) {
+        return 'image/png';
+    }
+
+    const signature = buffer.slice(0, 12).toString('ascii');
+    if (signature.startsWith('RIFF') && signature.slice(8, 12) === 'WEBP') {
+        return 'image/webp';
+    }
+
+    return null;
+}
+
+function assertValidImageBuffer(buffer, mimetype) {
+    const detectedMimeType = getDetectedMimeType(buffer);
+    const declaredMimeType = String(mimetype || '').toLowerCase();
+
+    if (!detectedMimeType || !ALLOWED_IMAGE_SIGNATURES.has(detectedMimeType)) {
+        const error = new Error('Only JPG, JPEG, PNG, and WEBP images are allowed');
+        error.status = 400;
+        throw error;
+    }
+
+    if (declaredMimeType && declaredMimeType !== detectedMimeType) {
+        const error = new Error('Uploaded file type does not match the file contents');
+        error.status = 400;
+        throw error;
+    }
+
+    return detectedMimeType;
+}
+
 async function storeBufferLocally(buffer, options = {}) {
     const folder = String(options.folder || 'media').replace(/[^a-z0-9_-]/gi, '_');
     const extension = getExtensionFromMimeType(options.mimetype);
@@ -108,12 +150,22 @@ async function deleteLocalMediaByUrl(url) {
 
 async function uploadBufferToMedia(buffer, options = {}) {
     try {
-        const cloudinaryResult = await uploadBufferToCloudinary(buffer, options);
+        const validatedMimeType = assertValidImageBuffer(buffer, options.mimetype);
+        const sanitizedOptions = {
+            ...options,
+            mimetype: validatedMimeType
+        };
+
+        const cloudinaryResult = await uploadBufferToCloudinary(buffer, sanitizedOptions);
         return {
             ...cloudinaryResult,
             storage: 'cloudinary'
         };
     } catch (error) {
+        if (error?.status === 400) {
+            throw error;
+        }
+
         return {
             secure_url: bufferToDataUrl(buffer, options.mimetype),
             public_id: null,
@@ -193,5 +245,7 @@ module.exports = {
     deleteMediaByUrl,
     storeBufferLocally,
     getPublicIdFromCloudinaryUrl,
-    isLocalMediaUrl
+    isLocalMediaUrl,
+    assertValidImageBuffer,
+    getDetectedMimeType
 };

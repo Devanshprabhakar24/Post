@@ -55,10 +55,16 @@ async function flushLikeDeltas() {
         const responses = await pipeline.exec();
 
         const operations = [];
+        const successfulPostIds = [];
         for (let i = 0; i < postIds.length; i += 1) {
-            const value = Number(responses?.[i]?.[1] || 0);
             const postId = Number(postIds[i]);
-            if (!Number.isFinite(postId) || !Number.isFinite(value) || value === 0) {
+            const [pipelineError, raw] = responses?.[i] || [];
+            if (pipelineError || !Number.isFinite(postId)) {
+                continue;
+            }
+
+            const value = Number(raw || 0);
+            if (!Number.isFinite(value) || value === 0) {
                 continue;
             }
 
@@ -70,6 +76,7 @@ async function flushLikeDeltas() {
                     }
                 }
             });
+            successfulPostIds.push(postId);
         }
 
         if (operations.length > 0) {
@@ -78,7 +85,7 @@ async function flushLikeDeltas() {
         }
 
         const cleanup = redis.pipeline();
-        postIds.forEach((postId) => {
+        successfulPostIds.forEach((postId) => {
             cleanup.del(buildDeltaKey(postId));
             cleanup.srem(LIKE_DELTA_SET_KEY, postId);
         });

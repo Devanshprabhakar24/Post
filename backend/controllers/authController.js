@@ -9,7 +9,8 @@ function buildToken(user) {
     return jwt.sign(
         {
             userId: user.userId,
-            email: user.email
+            email: user.email,
+            role: user.role || 'user'
         },
         process.env.JWT_SECRET,
         { expiresIn: '7d' }
@@ -22,9 +23,9 @@ function sanitizeUser(user) {
         name: user.name,
         username: user.username,
         email: user.email,
+        role: user.role || 'user',
         imageUrl: user.imageUrl || '',
         profilePic: user.profilePic || user.imageUrl || '',
-        profilePicData: user.profilePicData || '',
         profilePicContentType: user.profilePicContentType || '',
         createdAt: user.createdAt
     };
@@ -97,7 +98,8 @@ async function register(req, res) {
             username: `${baseUsername}_${nextUserId}`,
             email: normalizedEmail,
             password: hashedPassword,
-            isExternal: false
+            isExternal: false,
+            role: 'user'
         });
 
         const token = buildToken(user);

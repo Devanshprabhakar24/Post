@@ -15,6 +15,21 @@ const api = axios.create({
     timeout: 15000
 });
 
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error?.response?.status === 401) {
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+            localStorage.removeItem('post-explorer-auth-user');
+            if (typeof window !== 'undefined' && window.location?.pathname !== '/login') {
+                window.location.href = '/login';
+            }
+        }
+
+        return Promise.reject(error);
+    }
+);
+
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (token) {
