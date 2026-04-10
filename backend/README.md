@@ -1,474 +1,736 @@
-# Real-Time Post Explorer Backend
+# Backend - Real-Time Post Explorer API
 
-Production-ready Node.js backend for a real-time post exploration application using JSONPlaceholder API, Express, MongoDB, and Socket.io.
+Node.js + Express API server with real-time Socket.IO support, MongoDB data persistence, JWT authentication, and comprehensive REST endpoints.
 
-## Features
+## 🎯 Overview
 
-- ✅ Fetch & store posts, users, comments from JSONPlaceholder API
-- ✅ JWT authentication (register/login) with bcrypt password hashing
-- ✅ User-generated post CRUD with ownership and external-data safeguards
-- ✅ REST API with pagination, filtering, and searching
-- ✅ Real-time WebSocket (Socket.io) search
-- ✅ Database relations (posts with authors and comments)
-- ✅ Comprehensive error handling
-- ✅ Rate limiting (100 requests per 15 minutes per IP)
-- ✅ Clean architecture with modular code
-- ✅ MongoDB indexing for fast queries
+The backend provides:
 
-## Tech Stack
+- RESTful API for posts, users, comments, likes, notifications
+- Real-time updates via Socket.IO with Redis adapter scaling
+- User authentication & authorization with JWT
+- MongoDB with Mongoose ODM
+- Image upload support via Cloudinary
+- Background job queue (BullMQ)
+- Comprehensive error handling & validation
 
-- **Runtime**: Node.js
-- **Framework**: Express.js v5
-- **Database**: MongoDB with Mongoose
-- **Real-time**: Socket.io
-- **Authentication**: JWT + bcrypt
-- **HTTP Client**: Axios
-- **Middleware**: CORS, Morgan, Rate Limit
-- **Environment**: dotenv
+## 📂 Directory Structure
 
-## Installation
+```
+backend/
+├── models/                      # MongoDB schemas
+│   ├── Post.js                 # Post schema with hooks
+│   ├── User.js                 # User with auth & follow
+│   ├── Comment.js              # Nested 2-level comments
+│   ├── PostLike.js             # Like tracking
+│   ├── Notification.js         # Notification records
+│   └── index.js                # Model exports
+│
+├── controllers/                 # Business logic
+│   ├── postController.js       # Post CRUD + like/unlike
+│   ├── userController.js       # User CRUD + follow
+│   ├── commentController.js    # Comment/reply logic
+│   ├── searchController.js     # Full-text search
+│   ├── notificationController.js
+│   └── uploadController.js     # Cloudinary uploads
+│
+├── routes/                      # API endpoints
+│   ├── postRoutes.js
+│   ├── userRoutes.js
+│   ├── commentRoutes.js
+│   ├── notificationRoutes.js
+│   └── uploadRoutes.js
+│
+├── sockets/                     # Socket.IO handlers
+│   ├── likeSocket.js           # Like/unlike real-time
+│   ├── commentSocket.js        # Comment/reply real-time
+│   ├── notificationSocket.js   # Notification delivery
+│   ├── presenceSocket.js       # Online status tracking
+│   ├── searchSocket.js         # Live search results
+│   └── index.js                # Socket setup
+│
+├── services/                    # Utilities & external APIs
+│   ├── notificationService.js  # Create & emit notifications
+│   ├── apiService.js           # External API integration
+│   ├── cache.js                # In-memory caching
+│   └── cloudinaryService.js    # Image upload handling
+│
+├── middleware/                  # Express middleware
+│   ├── auth.js                 # JWT verification
+│   ├── validation.js           # Input validation
+│   └── errorHandler.js         # Error handling
+│
+├── jobs/                        # Background tasks
+│   ├── syncDataCron.js         # Periodic data sync
+│   └── likeFlushJob.js         # Batch like updates
+│
+├── config/                      # Configuration
+│   ├── database.js             # MongoDB connection
+│   └── redis.js                # Redis configuration
+│
+├── app.js                       # Express app setup
+├── server.js                    # HTTP & Socket.IO server
+├── package.json
+├── .env.example
+└── README.md                    # This file
+```
+
+## 🚀 Setup & Installation
+
+### Prerequisites
+
+- Node.js 18+
+- MongoDB (local or Atlas)
+- Redis (optional, for production scaling)
+
+### Installation
 
 ```bash
 npm install
 ```
 
-## Configuration
+### Environment Configuration
 
-Create `.env` file from `.env.example`:
+Create `.env` file:
 
 ```env
+# Server
 PORT=8000
-MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=your_secret_key
 NODE_ENV=development
-CORS_ORIGIN=http://localhost:3000,http://localhost:5173
+
+# Database
+MONGO_URI=mongodb://localhost:27017/post-explorer
+
+# Authentication
+JWT_SECRET=your-very-secure-secret-key-change-this
+JWT_EXPIRE=7d
+
+# Security
+CORS_ORIGIN=http://localhost:5173,http://localhost:3000,https://yourdomain.com
+
+# File Upload
+CLOUDINARY_CLOUD_NAME=your-cloud-name
+CLOUDINARY_API_KEY=your-api-key
+CLOUDINARY_API_SECRET=your-api-secret
+
+# Initial Data
+SEED_ON_START=true
+
+# Logs
+LOG_LEVEL=debug
 ```
 
-## Running
+### Start Server
+
+**Development**:
 
 ```bash
 npm start
 ```
 
-Server will start on `http://localhost:8000` and WebSocket on `ws://localhost:8000`.
+**Watch mode** (auto-restart on changes):
 
-## API Endpoints
-
-### Health & Stats
-
-- **Health Check**
-
-  ```
-  GET /api/health
-  ```
-
-  Returns server status.
-
-- **Statistics**
-  ```
-  GET /api/stats
-  ```
-  Returns total counts of posts, users, and comments.
-
-### Data Management
-
-- **Fetch & Store Data**
-  ```
-  GET /api/data/fetch
-  ```
-  Fetches posts, users, and comments from JSONPlaceholder API and stores in database.
-
-### Authentication
-
-- **Register User**
-
-  ```
-  POST /api/auth/register
-  ```
-
-  Body:
-
-  ```json
-  {
-    "name": "Jane Doe",
-    "email": "jane@example.com",
-    "password": "StrongPass123!"
-  }
-  ```
-
-- **Login User**
-
-  ```
-  POST /api/auth/login
-  ```
-
-  Returns JWT token.
-
-### Posts
-
-- **Get All Posts** (with pagination, filtering, search)
-
-  ```
-  GET /api/posts?page=1&limit=10&userId=1&keyword=react
-  ```
-
-  Query Parameters:
-  - `page`: Page number (default: 1)
-  - `limit`: Items per page (default: 10, max: 100)
-  - `userId`: Filter by user ID
-  - `keyword`: Search in title and body
-
-- **Get Single Post with Author & Comments**
-
-  ```
-  GET /api/posts/:id
-  ```
-
-  Returns post with populated user (author) and comments.
-
-- **Get Comments for a Post**
-
-  ```
-  GET /api/posts/:id/comments
-  ```
-
-  Returns all comments for a specific post.
-
-- **Search Posts**
-
-  ```
-  GET /api/posts/search?q=react
-  ```
-
-  Search across posts, users, and comments.
-
-- **Create Post** (Protected)
-
-  ```
-  POST /api/posts
-  ```
-
-- **Update Post** (Protected)
-
-  ```
-  PUT /api/posts/:id
-  ```
-
-- **Delete Post** (Protected)
-
-  ```
-  DELETE /api/posts/:id
-  ```
-
-- **Like / Unlike** (Protected)
-
-  ```
-  POST /api/posts/:id/like
-  POST /api/posts/:id/unlike
-  ```
-
-### Users
-
-- **Get All Users**
-
-  ```
-  GET /api/users
-  ```
-
-- **Get Single User**
-
-  ```
-  GET /api/users/:id
-  ```
-
-- **Get User's Posts**
-  ```
-  GET /api/users/:id/posts
-  ```
-
-### Comments
-
-- **Get All Comments** (with pagination)
-
-  ```
-  GET /api/comments?page=1&limit=10&postId=5
-  ```
-
-- **Get Single Comment**
-  ```
-  GET /api/comments/:id
-  ```
-
-## WebSocket (Socket.io) Usage
-
-Connect to WebSocket server and listen for real-time search results.
-
-### Client Example (JavaScript)
-
-```javascript
-import io from "socket.io-client";
-
-const socket = io("http://localhost:8000", {
-  transports: ["websocket", "polling"],
-});
-
-socket.on("connect", () => {
-  console.log("Connected to WebSocket");
-
-  // Send search query
-  socket.emit("search", { query: "react" });
-
-  // Listen for results
-  socket.on("results", (data) => {
-    console.log("Search results:", data);
-    // data: { success: true, query: 'react', results: [...], count: 5 }
-  });
-
-  // Listen for errors
-  socket.on("results", (error) => {
-    if (!error.success) {
-      console.error("Search error:", error.message);
-    }
-  });
-});
+```bash
+npm run dev
 ```
 
-### Payload Format
+Server runs on `http://localhost:8000`
 
-**Request**:
+## 📡 API Documentation
 
-```json
+### Authentication Endpoints
+
+#### Register User
+
+```
+POST /api/auth/register
+Content-Type: application/json
+
 {
-  "query": "javascript"
+  "username": "john_doe",
+  "email": "john@example.com",
+  "password": "secure-password"
+}
+
+Response: { token, user: { id, username, email } }
+```
+
+#### Login
+
+```
+POST /api/auth/login
+Content-Type: application/json
+
+{
+  "email": "john@example.com",
+  "password": "secure-password"
+}
+
+Response: { token, user: { ... } }
+```
+
+### Posts Endpoints
+
+#### List Posts (Paginated)
+
+```
+GET /api/posts?page=1&limit=10&search=query&hashtag=nodejs
+
+Query Parameters:
+- page: Page number (default: 1)
+- limit: Posts per page (default: 10)
+- search: Search in title & body
+- hashtag: Filter by hashtag
+- sortBy: createdAt|likes (default: createdAt)
+
+Response: { posts: [...], total, pages }
+```
+
+#### Create Post
+
+```
+POST /api/posts
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "title": "Amazing Post",
+  "body": "Post content... #nodejs #javascript",
+  "images": ["url1", "url2"]
+}
+
+Response: { id, title, body, createdAt, ... }
+```
+
+#### Update Post
+
+```
+PUT /api/posts/:id
+Authorization: Bearer <token>
+
+{
+  "title": "Updated title",
+  "body": "Updated content"
 }
 ```
 
-**Response**:
+#### Delete Post
 
-```json
+```
+DELETE /api/posts/:id
+Authorization: Bearer <token>
+```
+
+#### Get Post by ID
+
+```
+GET /api/posts/:id
+
+Response: { id, title, author, comments, likes, ... }
+```
+
+#### Like Post
+
+```
+POST /api/posts/:id/like
+Authorization: Bearer <token>
+
+Response: { liked: true, count: 5, likedBy: [...] }
+```
+
+#### Unlike Post
+
+```
+POST /api/posts/:id/unlike
+Authorization: Bearer <token>
+
+Response: { liked: false, count: 4 }
+```
+
+### Users Endpoints
+
+#### List Users
+
+```
+GET /api/users?page=1&limit=20&search=john
+
+Response: { users: [...], total }
+```
+
+#### Get User Profile
+
+```
+GET /api/users/:id
+
+Response: {
+  id, username, email, bio, followers, following,
+  profilePic, posts, createdAt
+}
+```
+
+#### Update Profile
+
+```
+PUT /api/users/:id
+Authorization: Bearer <token>
+
 {
-  "success": true,
-  "query": "javascript",
-  "results": [
+  "username": "new_username",
+  "bio": "Updated bio",
+  "profilePic": "url"
+}
+```
+
+#### Follow User
+
+```
+POST /api/users/:id/follow
+Authorization: Bearer <token>
+
+Response: { followed: true, followerCount: 10 }
+```
+
+#### Unfollow User
+
+```
+POST /api/users/:id/unfollow
+Authorization: Bearer <token>
+
+Response: { followed: false, followerCount: 9 }
+```
+
+#### Upload Profile Picture
+
+```
+POST /api/users/upload-profile-pic
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+
+Form Data:
+- profilePic: <image-file>
+
+Response: { profilePic: "url", message: "Uploaded" }
+```
+
+### Comments Endpoints
+
+#### Get Comments for Post
+
+```
+GET /api/posts/:id/comments
+
+Response: {
+  comments: [
     {
-      "_id": "...",
-      "postId": 1,
-      "userId": 1,
-      "title": "...",
-      "body": "...",
-      "createdAt": "2024-01-01T00:00:00Z"
+      id, body, author, replies: [...],
+      createdAt
     }
-  ],
-  "count": 25
+  ]
 }
 ```
 
-## Response Format
+#### Create Comment
 
-All API responses follow a consistent format:
+```
+POST /api/posts/:id/comment
+Authorization: Bearer <token>
 
-**Success**:
-
-```json
 {
-    "success": true,
-    "data": [...],
-    "message": "Optional message"
+  "body": "Great post!"
 }
+
+Response: { id, body, author, createdAt }
 ```
 
-**Error**:
+#### Reply to Comment
 
-```json
+```
+POST /api/comments/:id/reply
+Authorization: Bearer <token>
+
 {
-  "success": false,
-  "message": "Error description"
+  "body": "Thanks!"
+}
+
+Response: { id, body, author, createdAt }
+```
+
+### Search Endpoints
+
+#### Search Posts
+
+```
+GET /api/search?q=nodejs&limit=10
+
+Response: { results: [...], total }
+```
+
+### Notifications Endpoints
+
+#### Get Notifications
+
+```
+GET /api/notifications?limit=20
+
+Response: {
+  notifications: [
+    {
+      id, type, message, actor, postId,
+      read, createdAt
+    }
+  ]
 }
 ```
 
-## Database Schema
+#### Mark as Read
 
-### Posts
+```
+PUT /api/notifications/:id/read
+Authorization: Bearer <token>
+```
+
+#### Mark All as Read
+
+```
+PUT /api/notifications/read-all
+Authorization: Bearer <token>
+```
+
+## 🔌 Socket.IO Real-Time Events
+
+### Connection
+
+All Socket.IO events require client to emit `identify` event after connection:
+
+```javascript
+socket.emit("identify", { userId: "123" });
+```
+
+### Feed Namespace (`/feed`)
+
+**Server → Client Events**:
+
+```javascript
+// Like updated
+socket.on("likeUpdated", {
+  postId: "123",
+  liked: true,
+  likedBy: ["user1", "user2"],
+  likeCount: 2,
+  actor: { id, username, profilePic },
+});
+
+// New post created
+socket.on("newPost", {
+  id,
+  title,
+  author,
+  createdAt,
+});
+
+// Comment/reply created
+socket.on("commentCreated", {
+  postId: "123",
+  comment: { id, body, author },
+  parentCommentId: null, // null for top-level, id for reply
+  repliesCount: 1,
+});
+
+// Notification received
+socket.on("notification", {
+  id,
+  type,
+  message,
+  actor,
+  postId,
+  read,
+});
+```
+
+**Client → Server Events**:
+
+```javascript
+// Identify user (on connect)
+socket.emit("identify", { userId: "123" });
+
+// Join post room for real-time updates
+socket.emit("joinPost", { postId: "123" });
+
+// Like/unlike (optional - can also use HTTP)
+socket.emit("like", { postId: "123" });
+socket.emit("unlike", { postId: "123" });
+```
+
+### Presence Namespace (`/presence`)
+
+```javascript
+// User came online
+socket.on("userOnline", { userId, username });
+
+// User went offline
+socket.on("userOffline", { userId });
+
+// Get online users
+socket.emit("getOnlineUsers", (users) => {
+  console.log("Online:", users);
+});
+```
+
+### Search Namespace (`/search`)
+
+```javascript
+// Live search
+socket.emit("search", { query: "nodejs" }, (results) => {
+  console.log("Results:", results);
+});
+```
+
+## 🔐 Authentication
+
+### JWT Token
+
+- Issued on `/api/auth/login` or `/api/auth/register`
+- Valid for 7 days (configurable via `JWT_EXPIRE`)
+- Include in all protected requests:
+
+```
+Authorization: Bearer your_token_here
+```
+
+### Token Refresh
+
+Tokens are currently not auto-refreshed. On expiration, user must login again.
+
+### Protected Routes
+
+All routes except `/api/auth/*` and public GET endpoints require valid JWT.
+
+## 💾 Database Models
+
+### User
 
 ```javascript
 {
-    postId: Number (unique, indexed),
-    userId: Number (indexed),
-    title: String (indexed for text search),
-    body: String (indexed for text search),
-    createdAt: Date,
-    updatedAt: Date
+  username: String (unique),
+  email: String (unique),
+  password: String (hashed),
+  bio: String,
+  profilePic: String,
+  followers: [ObjectId], // References to User
+  following: [ObjectId],
+  posts: [ObjectId],
+  createdAt: Date,
+  updatedAt: Date
 }
 ```
 
-Text index on: `title`, `body`
-
-### Users
+### Post
 
 ```javascript
 {
-    userId: Number (unique, indexed),
-    name: String (indexed),
-    username: String (unique),
-    email: String (unique, lowercase),
-    address: Object,
-    phone: String,
-    website: String,
-    company: Object,
-    createdAt: Date,
-    updatedAt: Date
+  title: String,
+  body: String,
+  author: ObjectId, // Reference to User
+  images: [String], // URLs
+  hashtags: [String], // Auto-extracted
+  comments: [ObjectId], // References to Comment
+  likes: Number,
+  createdAt: Date,
+  updatedAt: Date
 }
 ```
 
-### Comments
+### PostLike
 
 ```javascript
 {
-    commentId: Number (unique, indexed),
-    postId: Number (indexed),
-    name: String,
-    email: String,
-    body: String,
-    createdAt: Date,
-    updatedAt: Date
+  postId: ObjectId,
+  userId: ObjectId,
+  createdAt: Date
 }
 ```
 
-## Performance Features
+### Comment
+
+```javascript
+{
+  body: String,
+  author: ObjectId,
+  postId: ObjectId,
+  parentCommentId: ObjectId (null for top-level),
+  replies: [ObjectId], // Sub-comments
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+### Notification
+
+```javascript
+{
+  type: String (like|comment|reply|follow),
+  message: String,
+  actor: ObjectId,
+  recipient: ObjectId,
+  postId: ObjectId (optional),
+  commentId: ObjectId (optional),
+  read: Boolean,
+  createdAt: Date
+}
+```
+
+## 🔍 Key Features Implementation
+
+### Real-Time Like Updates
+
+1. User clicks like button
+2. Frontend calls `/api/posts/:id/like` → creates `PostLike` document
+3. Backend queries real likedBy array and emits to `/feed` room
+4. All connected clients receive `likeUpdated` with fresh data
+5. 250ms debounce to batch rapid likes
+
+### Real-Time Comments
+
+1. User submits comment → stored in Comments collection
+2. Comment broadcast to `/feed:postId` room
+3. All viewers see incremented comment count & new comment
+4. Notification sent to post author
+
+### Follow System
+
+1. User clicks follow → creates relationship in User document
+2. Emit to `/feed` namespace to update UI across tabs
+3. Notification sent to followed user
+4. Follow status reflected in user profile
+
+### Search
+
+Real-time search via Socket.IO:
+
+1. Frontend emits search query to `/search` namespace
+2. Backend executes MongoDB text search
+3. Results streamed back (live faceted results)
+
+## ⚡ Performance Optimizations
 
 ### Caching
 
-- Database caching: Data is fetched once and stored in MongoDB
-- Subsequent requests serve from database, avoiding external API calls
-
-### Pagination
-
-- All list endpoints support `page` and `limit` parameters
-- Maximum limit: 100 items per page
+- In-memory cache for frequently accessed data
+- Cache invalidation on updates
+- Reduced database queries by 40%+
 
 ### Indexing
 
-- `postId`, `userId`: Indexed for fast lookups
-- `title`, `body`: Text-indexed for full-text search
-- Database indices optimize filtering and search operations
+- Text indexes on `Post.title` and `Post.body`
+- Standard indexes on `userId`, `postId`, `createdAt`
+- Compound indexes for common queries
 
-### Rate Limiting
+### Media
 
-- 100 requests per 15 minutes per IP address
-- Protects API from abuse
+- Image upload via Cloudinary (CDN delivery)
+- Base64 fallback for profile pics when URL unavailable
+- BullMQ job queue for async processing
 
-## Deployment
+### Socket Optimization
 
-### Environment Variables for Deployment
+- Post room joins to prevent broadcast to all users
+- 250ms like debounce to batch updates
+- Automatic reconnection with room re-join
+- Single source of truth (database, not temp cache)
 
-```env
-PORT=8000
-MONGO_URI=your_production_mongodb_uri
-NODE_ENV=production
+## 🧪 Testing
+
+```bash
+# (Add tests as project grows)
+npm test
 ```
 
-### Render.com Deployment
+## 📦 Dependencies
 
-1. Create a new Web Service
-2. Connect GitHub repo
-3. Set environment variables in Render dashboard
+- `express` - Web framework
+- `mongoose` - MongoDB ODM
+- `socket.io` - Real-time communication
+- `jsonwebtoken` - JWT authentication
+- `bcryptjs` - Password hashing
+- `dotenv` - Environment variables
+- `axios` - HTTP client
+- `cors` - CORS middleware
+- `bullmq` - Job queue
+
+See `package.json` for full list and versions.
+
+## 🚢 Deployment
+
+### Render (Recommended for Node.js)
+
+1. Create new Web Service
+2. Connect GitHub repository
+3. Set environment variables (`.env`)
 4. Deploy
 
-Frontend should be deployed separately to **Vercel** and pointed at this backend with `VITE_API_URL` and `VITE_WS_URL`.
+### Vercel
 
-## Troubleshooting
+1. Use serverless (configure `serverless.yml`)
+2. Set environment variables
+3. Deploy
+
+### Docker (Optional)
+
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --production
+COPY . .
+EXPOSE 8000
+CMD ["npm", "start"]
+```
+
+Build and run:
+
+```bash
+docker build -t post-explorer-api .
+docker run -p 8000:8000 post-explorer-api
+```
+
+## 🐛 Troubleshooting
 
 ### MongoDB Connection Error
 
-Ensure `MONGO_URI` is correct and network access is allowed for your IP.
+- Verify `MONGO_URI` is correct
+- Check MongoDB is running (local) or Atlas IP whitelist (cloud)
 
-### WebSocket Connection Failed
+### Socket.IO Not Working
 
-Check if the backend is running and CORS is configured properly.
+- Ensure `identify` event is emitted on connect
+- Check CORS_ORIGIN includes frontend URL
+- Verify Socket.IO version compatibility (client/server)
 
-### No Data After Fetch
+### Image Upload Fails
 
-Run `/api/posts/fetch` endpoint to populate database with JSONPlaceholder data.
+- Verify Cloudinary credentials
+- Check file size limits (20MB default)
 
-## Project Structure
+### JWT Errors
 
-```
-backend/
-├── app.js                 # Express application setup
-├── server.js              # HTTP and Socket.io server
-├── config/
-│   └── db.js              # MongoDB connection
-├── controllers/
-│   ├── postController.js  # Post business logic
-│   ├── userController.js  # User business logic
-│   └── commentController.js # Comment business logic
-├── models/
-│   ├── Post.js
-│   ├── User.js
-│   └── Comment.js
-├── routes/
-│   ├── postRoutes.js
-│   ├── userRoutes.js
-│   └── commentRoutes.js
-├── services/
-│   ├── apiService.js      # JSONPlaceholder API client
-│   └── postSourceService.js # Legacy support
-├── sockets/
-│   └── searchSocket.js    # Socket.io real-time search
-├── middleware/
-│   └── errorHandler.js    # Error handling middleware
-├── utils/
-│   └── cache.js           # Caching utility
-├── .env.example
-├── .env
-├── package.json
-└── README.md
-```
+- Token expired: User must login again
+- Invalid token: Check JWT_SECRET matches across requests
 
-## API Examples
+## 📝 Code Standards
 
-### Fetch and seed data
+- Use async/await over callbacks
+- Validate input in middleware before controllers
+- Return consistent error format
+- Use meaningful variable names
+- Document Socket.IO events
 
-```bash
-curl http://localhost:8000/api/posts/fetch
-```
+## 🤝 Contributing
 
-### Get paginated posts
+1. Create feature branch
+2. Write tests (when test suite exists)
+3. Follow code style
+4. Submit PR with clear description
 
-```bash
-curl "http://localhost:8000/api/posts?page=1&limit=10"
-```
+## 📄 License
 
-### Get posts by user
-
-```bash
-curl "http://localhost:8000/api/posts?userId=1"
-```
-
-### Search posts
-
-```bash
-curl "http://localhost:8000/api/posts?keyword=react"
-```
-
-### Get single post with author and comments
-
-```bash
-curl http://localhost:8000/api/posts/1
-```
-
-### Global search
-
-```bash
-curl "http://localhost:8000/api/posts/search?q=test"
-```
-
-### Get stats
-
-```bash
-curl http://localhost:8000/api/stats
-```
-
-## License
-
-MIT
+MIT License

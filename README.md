@@ -1,103 +1,328 @@
-# Real-Time Post Explorer
+# 📱 Real-Time Post Explorer
 
-A comprehensive full-stack application featuring a production-ready backend and responsive frontend for exploring posts, users, and comments from JSONPlaceholder API in real-time.
+A modern, full-stack social media application with real-time updates, user authentication, follow system, and live notifications. Built with React 19, Vite, Node.js/Express, and MongoDB.
 
-## 🚀 Features
+**Live Demo**: [Deployed on Vercel + Render](https://post-explorer.vercel.app)
 
-### Backend
+## ✨ Features
 
-- ✅ RESTful API with pagination, filtering, and full-text search
-- ✅ Real-time WebSocket (Socket.io) for instant search updates
-- ✅ MongoDB with optimized indexing
-- ✅ Data fetching & caching from JSONPlaceholder API
-- ✅ Database relations (posts with authors and comments)
-- ✅ Rate limiting (100 req/15m per IP)
-- ✅ Comprehensive error handling
-- ✅ Production-ready deployment configuration
+### Core Features
 
-### Frontend
+- 📝 **Posts** - Create, read, update, delete posts with images
+- 👤 **User Authentication** - Register, login with JWT & bcrypt
+- 💬 **Comments & Replies** - Nested 2-level comment threads with real-time updates
+- ❤️ **Likes** - Real-time like/unlike with instant count updates across all users
+- 🔍 **Search** - Full-text search posts by title, body, author with WebSocket live results
+- 🏷️ **Hashtags** - Auto-extract hashtags from posts, filter by hashtag
+- 👥 **Follow System** - Follow/unfollow users, view followers/following lists
+- 🔔 **Notifications** - Real-time notifications for likes, comments, and follows
+- 🌙 **Dark/Light Mode** - Theme support with CSS variables
 
-- ✅ Modern React UI with responsive design
-- ✅ Real-time search using WebSocket
-- ✅ Pagination for large datasets
-- ✅ Clean, accessible component architecture
-- ✅ Performance optimized bundle
+### Real-Time & Socket.IO
 
-## 📋 Project Structure
+- ✅ Live like updates from all users
+- ✅ Real-time comment/reply creation & count increments
+- ✅ Instant follow/unfollow status across sessions
+- ✅ Live notification delivery via Socket.IO namespaces
+- ✅ User presence tracking (online status)
+- ✅ Automatic reconnection with room re-join on disconnect
+
+### Technical Features
+
+- 🚀 RESTful API with pagination & filtering
+- 📊 MongoDB with optimized indexing & caching
+- 🔐 JWT authentication with secure token handling
+- 📱 Fully responsive mobile-first design
+- ⚡ Production-ready error handling & validation
+- 🎨 Tailwind CSS with theme system
+- 📦 Optimized Vite build with code splitting
+- 🗂️ Background data seeding (non-blocking startup)
+- 📤 Image uploads via Cloudinary + BullMQ queue
+
+## 🏗️ Project Structure
 
 ```
 .
 ├── backend/
-│   ├── models/           # MongoDB schemas (Post, User, Comment)
-│   ├── controllers/      # Business logic (post, user, comment)
-│   ├── routes/           # API endpoints
-│   ├── services/         # External API & helpers
-│   ├── sockets/          # WebSocket handlers
-│   ├── middleware/       # Error handling & validation
-│   ├── utils/            # Caching & utilities
-│   ├── config/           # Database configuration
-│   ├── app.js            # Express setup
-│   ├── server.js         # HTTP & WebSocket server
-│   ├── package.json
-│   └── README.md         # Backend documentation
+│   ├── models/              # MongoDB schemas
+│   │   ├── Post.js          # Post with likes, images, hashtags
+│   │   ├── User.js          # User with follow/auth
+│   │   ├── Comment.js       # Comment with nested replies
+│   │   ├── PostLike.js      # Like tracking
+│   │   └── Notification.js  # Notification records
+│   ├── controllers/         # Business logic
+│   │   ├── postController.js
+│   │   ├── userController.js
+│   │   ├── commentController.js
+│   │   └── notificationController.js
+│   ├── routes/              # API endpoints
+│   ├── sockets/             # Socket.IO handlers
+│   │   ├── likeSocket.js
+│   │   ├── commentSocket.js
+│   │   ├── notificationSocket.js
+│   │   ├── presenceSocket.js
+│   │   └── searchSocket.js
+│   ├── services/            # External APIs & utilities
+│   ├── middleware/          # Auth, validation, error handling
+│   ├── jobs/                # Background tasks (sync cron, like flush)
+│   ├── app.js               # Express app setup
+│   ├── server.js            # HTTP & Socket.IO server
+│   └── package.json
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── components/   # Reusable UI components
-│   │   ├── hooks/        # Custom React hooks
-│   │   ├── services/     # API client
-│   │   ├── App.jsx       # Main component
-│   │   ├── main.jsx      # Entry point
-│   │   └── index.css     # Styling
-│   ├── package.json
-│   └── README.md         # Frontend documentation
+│   │   ├── components/      # Reusable React components
+│   │   │   ├── PostCard.jsx
+│   │   │   ├── Navbar.jsx
+│   │   │   ├── LeftSidebar.jsx
+│   │   │   ├── RightPanel.jsx
+│   │   │   └── NotificationPanel.jsx
+│   │   ├── pages/           # Route pages
+│   │   │   ├── Home.jsx
+│   │   │   ├── PostDetails.jsx
+│   │   │   ├── Profile.jsx
+│   │   │   ├── Login.jsx
+│   │   │   └── Register.jsx
+│   │   ├── context/         # React context
+│   │   │   ├── AuthContext.jsx
+│   │   │   └── SocketContext.jsx
+│   │   ├── services/        # API & Socket clients
+│   │   ├── hooks/           # Custom React hooks
+│   │   ├── App.jsx
+│   │   └── index.css
+│   ├── vite.config.js
+│   └── package.json
 │
-└── README.md             # This file
+└── README.md                # This file
 ```
 
 ## 🛠️ Tech Stack
 
 ### Backend
 
-- **Runtime**: Node.js
+- **Runtime**: Node.js 18+
 - **Framework**: Express.js v5
 - **Database**: MongoDB + Mongoose
-- **Real-time**: Socket.io
-- **HTTP Client**: Axios
-- **Middleware**: CORS, Morgan, Rate Limit
-- **Environment**: dotenv
+- **Real-time**: Socket.IO with Redis adapter
+- **Authentication**: JWT + bcrypt
+- **File Storage**: Cloudinary
+- **Task Queue**: BullMQ (Redis)
+- **Caching**: In-memory cache utility
+- **API Client**: Axios
 
 ### Frontend
 
 - **Framework**: React 19
-- **Build Tool**: Vite
-- **HTTP Client**: Axios
-- **Styling**: Plain CSS
-- **State**: React Hooks
+- **Build**: Vite 6
+- **HTTP**: Axios with JWT interceptor
+- **Real-time**: Socket.IO client
+- **Styling**: Tailwind CSS v4
+- **Animations**: Framer Motion
+- **UI Components**: Lucide icons
+- **Routing**: React Router v7
+- **State**: React Hooks + Context API
 
-## 📦 Installation
+## 🚀 Quick Start
 
-### Backend
+### Prerequisites
+
+- Node.js 18+
+- MongoDB (local or Atlas)
+- Redis (optional, for Socket.IO scaling)
+
+### Backend Setup
 
 ```bash
 cd backend
 npm install
-cp .env.example .env
-# Edit .env with your MongoDB URI
+
+# Create .env file
+cat > .env << EOF
+PORT=8000
+MONGO_URI=mongodb://localhost:27017/post-explorer
+JWT_SECRET=your-secret-key-here
+NODE_ENV=development
+CORS_ORIGIN=http://localhost:5173,http://localhost:3000
+SEED_ON_START=true
+EOF
+
+# Start server
 npm start
 ```
 
-**Default**: `http://localhost:8000`
+Server runs on `http://localhost:8000` and WebSocket on `ws://localhost:8000`
 
-### Frontend
+### Frontend Setup
 
 ```bash
 cd frontend
 npm install
-cp .env.example .env
-# Edit .env with backend URLs
+
+# Create .env file
+cat > .env << EOF
+VITE_API_URL=http://localhost:8000
+VITE_WS_URL=http://localhost:8000
+EOF
+
+# Start dev server
 npm run dev
 ```
+
+App runs on `http://localhost:5173`
+
+## 📡 API Endpoints
+
+### Authentication
+
+- `POST /api/auth/register` - Register new user
+- `POST /api/auth/login` - Login user
+
+### Posts
+
+- `GET /api/posts` - Get posts (paginated)
+- `POST /api/posts` - Create post
+- `PUT /api/posts/:id` - Update post
+- `DELETE /api/posts/:id` - Delete post
+- `GET /api/posts/:id` - Get post by ID
+- `POST /api/posts/:id/like` - Like post
+- `POST /api/posts/:id/unlike` - Unlike post
+- `GET /api/posts/:id/likes` - Get like status
+
+### Users
+
+- `GET /api/users` - Get users list
+- `GET /api/users/:id` - Get user by ID
+- `PUT /api/users/:id` - Update user
+- `POST /api/users/:id/follow` - Follow user
+- `POST /api/users/:id/unfollow` - Unfollow user
+- `GET /api/users/:id/posts` - Get posts by user
+- `POST /api/users/upload-profile-pic` - Upload avatar
+
+### Comments
+
+- `GET /api/posts/:id/comments` - Get comments for post
+- `POST /api/posts/:id/comment` - Create comment
+- `POST /api/comments/:id/reply` - Reply to comment
+
+### Search & Notifications
+
+- `GET /api/search?q=query` - Search posts
+- `GET /api/notifications` - Get notifications
+- `PUT /api/notifications/:id/read` - Mark notification read
+- `PUT /api/notifications/read-all` - Mark all as read
+
+## 🔌 Socket.IO Events
+
+### Feed Namespace (`/feed`)
+
+- `likeUpdated` - Real-time like count & status
+- `newPost` - New post created
+- `commentCreated` - New comment/reply
+- `notification` - Notification received
+- `identify` - Identify user (emit on connect)
+- `joinPost` - Join post room for live updates
+
+### Presence Namespace (`/presence`)
+
+- `userOnline` - User came online
+- `userOffline` - User went offline
+- `identify` - Identify user
+
+### Search Namespace (`/search`)
+
+- `search` - Start search query
+- `results` - Search results (live)
+
+## 🔐 Authentication
+
+Requests require JWT token in header:
+
+```
+Authorization: Bearer <token>
+```
+
+Token is stored in `localStorage` and automatically attached by Axios interceptor.
+
+## 🎨 Project Highlights
+
+### Real-time Sync
+
+- **Likes**: When any user likes a post, all connected users see instant like count & heart fill state
+- **Comments**: New comments immediately increment counter and appear in threads
+- **Follows**: Follow state updates across tabs/browsers in real-time
+- **Notifications**: Toast + panel updates for post interactions
+
+### Optimizations
+
+- Debounced like flush (250ms) to batch updates
+- Lazy socket creation to prevent race conditions
+- Post room auto-join on feed load
+- Reconnection with automatic room re-join
+- Automatic socket re-identification after login/logout
+- Optimistic UI updates with rollback on error
+- Profile image fallbacks (base64 from DB when URL missing)
+
+### UI/UX
+
+- Dark/light mode with CSS variables
+- Responsive grid layout (mobile-first)
+- Skeleton loaders for slow networks
+- Toast notifications for actions
+- Modal preview for post images
+- Infinite scroll pagination
+- High contrast readable text
+
+## 🚢 Deployment
+
+### Backend (Render)
+
+```bash
+# Set environment variables in Render dashboard
+PORT=8000
+MONGO_URI=<your-mongodb-uri>
+JWT_SECRET=<your-secret>
+CORS_ORIGIN=<your-frontend-url>
+```
+
+### Frontend (Vercel)
+
+```bash
+# Set environment variables in Vercel dashboard
+VITE_API_URL=<your-backend-url>
+VITE_WS_URL=<your-backend-url>
+```
+
+## 📝 Environment Variables
+
+### Backend
+
+- `PORT` - Server port (default: 8000)
+- `MONGO_URI` - MongoDB connection string
+- `JWT_SECRET` - JWT signing secret
+- `NODE_ENV` - development/production
+- `CORS_ORIGIN` - Allowed origins (comma-separated)
+- `SEED_ON_START` - Auto-seed data on startup (default: true)
+
+### Frontend
+
+- `VITE_API_URL` - Backend API base URL
+- `VITE_WS_URL` - WebSocket URL (usually same as API_URL)
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/feature-name`)
+3. Commit changes (`git commit -m 'Add feature'`)
+4. Push to branch (`git push origin feature/feature-name`)
+5. Open Pull Request
+
+## 📄 License
+
+MIT License - see LICENSE file for details
+
+## 🙋 Support
+
+For issues, questions, or suggestions, please open an issue on GitHub.
 
 **Default**: `http://localhost:3000`
 
