@@ -28,11 +28,11 @@ export default function NotificationPanel({ open, onClose }) {
                         animate="open"
                         exit="closed"
                         transition={reduced ? { duration: 0 } : undefined}
-                        className="fixed right-0 top-0 z-[90] h-screen w-[min(95vw,430px)] border-l border-volt/45 bg-ink-soft/95 p-5 shadow-2xl backdrop-blur-2xl"
+                        className="fixed right-0 top-0 z-[90] h-screen w-[min(95vw,430px)] border-l border-[var(--border-soft)] bg-[var(--bg-card)] p-5 shadow-2xl backdrop-blur-2xl dark:border-volt/45"
                     >
                         <div className="mb-5 flex items-center justify-between">
-                            <h3 className="font-display text-4xl text-paper">Alerts</h3>
-                            <button type="button" onClick={onClose} className="ui-font text-xs uppercase tracking-[0.18em] text-mist hover:text-volt">
+                            <h3 className="font-display text-4xl text-[var(--text-primary)]">Alerts</h3>
+                            <button type="button" onClick={onClose} className="ui-font text-xs uppercase tracking-[0.18em] text-[var(--text-secondary)] hover:text-[var(--accent-red)]">
                                 Close
                             </button>
                         </div>
@@ -48,7 +48,7 @@ export default function NotificationPanel({ open, onClose }) {
                                         clearNotifications();
                                     }
                                 }}
-                                className="rounded-full border border-mist/45 px-3 py-1 ui-font text-[11px] uppercase tracking-[0.14em] text-mist hover:border-ember hover:text-ember"
+                                className="rounded-full border border-[var(--border-soft)] px-3 py-1 ui-font text-[11px] uppercase tracking-[0.14em] text-[var(--text-secondary)] hover:border-ember hover:text-ember"
                             >
                                 <Trash2 className="mr-1 inline h-3 w-3" /> Clear
                             </button>
@@ -56,21 +56,21 @@ export default function NotificationPanel({ open, onClose }) {
 
                         <div className="max-h-[calc(100vh-9rem)] space-y-2 overflow-y-auto pr-1">
                             {notifications.length === 0 ? (
-                                <div className="rounded-2xl border border-mist/30 p-4 text-center">
-                                    <BellRing className="mx-auto h-6 w-6 text-mist" />
-                                    <p className="mt-2 font-body italic text-mist">No alerts yet.</p>
+                                <div className="rounded-2xl border border-[var(--border-soft)] p-4 text-center">
+                                    <BellRing className="mx-auto h-6 w-6 text-[var(--text-tertiary)]" />
+                                    <p className="mt-2 font-body italic text-[var(--text-secondary)]">No alerts yet.</p>
                                 </div>
                             ) : (
                                 notifications.map((item) => (
                                     <motion.div
                                         key={item.id}
                                         variants={drawerItemVariants}
-                                        className={`rounded-2xl border p-3 ${item.read ? 'border-mist/28 bg-ink/35' : 'border-volt/50 bg-volt/10'}`}
+                                        className={`rounded-2xl border p-3 ${item.read ? 'border-[var(--border-soft)] bg-[var(--bg-card-soft)]' : 'border-volt/50 bg-volt/10'}`}
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0">
-                                                <p className="font-body text-sm text-paper">{item.message}</p>
-                                                <p className="mt-1 ui-font text-[10px] uppercase tracking-[0.14em] text-mist">
+                                                <p className="font-body text-sm text-[var(--text-primary)]">{item.message}</p>
+                                                <p className="mt-1 ui-font text-[10px] uppercase tracking-[0.14em] text-[var(--text-tertiary)]">
                                                     {new Date(item.createdAt).toLocaleTimeString()}
                                                 </p>
                                             </div>
@@ -91,7 +91,7 @@ export default function NotificationPanel({ open, onClose }) {
                                             ) : <span />}
 
                                             {item.targetUrl && (
-                                                <Link to={item.targetUrl} onClick={onClose} className="inline-flex items-center gap-1 ui-font text-[10px] uppercase tracking-[0.14em] text-mist">
+                                                <Link to={item.targetUrl} onClick={onClose} className="inline-flex items-center gap-1 ui-font text-[10px] uppercase tracking-[0.14em] text-[var(--text-secondary)]">
                                                     Open <ChevronRight className="h-3 w-3" />
                                                 </Link>
                                             )}

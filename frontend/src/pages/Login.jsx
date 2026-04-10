@@ -11,7 +11,7 @@ function InputField({ id, label, type = 'text', value, onChange, error, children
     return (
         <label htmlFor={id} className="block space-y-1">
             <span className="ui-font text-[10px] uppercase tracking-[0.18em] text-[var(--text-secondary)]">{label}</span>
-            <div className="group rounded-xl border border-[var(--border-soft)] bg-[rgba(255,255,255,0.26)] px-3 py-2 transition focus-within:border-volt dark:bg-[rgba(255,255,255,0.03)]">
+            <div className="group rounded-xl border border-[var(--border-soft)] bg-[var(--bg-card-soft)] px-3 py-2 transition focus-within:border-volt dark:bg-[rgba(255,255,255,0.03)]">
                 <input
                     id={id}
                     type={type}
@@ -93,7 +93,7 @@ export default function Login() {
                 initial={reduced ? { opacity: 1 } : { opacity: 0, x: 30 }}
                 animate={{ opacity: 1, x: 0 }}
                 onSubmit={onSubmit}
-                className="flex flex-col justify-center gap-4 bg-[#f8f6f2] px-6 py-10 text-[var(--text-primary)]"
+                className="flex flex-col justify-center gap-4 bg-[var(--bg-card)] px-6 py-10 text-[var(--text-primary)]"
             >
                 <h1 className="font-display text-6xl leading-none text-[var(--text-primary)]">LOGIN</h1>
                 <p className="font-body text-lg italic text-[var(--text-secondary)]">Welcome to the live editorial feed.</p>
@@ -114,7 +114,7 @@ export default function Login() {
 
                 <label htmlFor="password" className="block space-y-1">
                     <span className="ui-font text-[10px] uppercase tracking-[0.18em] text-[var(--text-secondary)]">Password</span>
-                    <div className="group relative rounded-xl border border-[var(--border-soft)] bg-[rgba(255,255,255,0.26)] px-3 py-2 transition focus-within:border-volt dark:bg-[rgba(255,255,255,0.03)]">
+                    <div className="group relative rounded-xl border border-[var(--border-soft)] bg-[var(--bg-card-soft)] px-3 py-2 transition focus-within:border-volt dark:bg-[rgba(255,255,255,0.03)]">
                         <input
                             id="password"
                             type={showPassword ? 'text' : 'password'}
@@ -158,7 +158,7 @@ export default function Login() {
                 </motion.button>
 
                 <p className="ui-font text-xs uppercase tracking-[0.12em] text-[var(--text-secondary)]">
-                    No account? <Link to="/register" className="text-[#7e9200]">Register</Link>
+                    No account? <Link to="/register" className="text-volt hover:underline">Register</Link>
                 </p>
             </motion.form>
         </section>

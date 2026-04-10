@@ -5,13 +5,13 @@ export default {
     theme: {
         extend: {
             colors: {
-                ink: 'var(--ink)',
-                'ink-soft': 'var(--ink-soft)',
-                paper: 'var(--paper)',
-                'paper-mid': 'var(--paper-mid)',
+                ink: 'var(--color-ink)',
+                'ink-soft': 'var(--color-ink-soft)',
+                paper: 'var(--color-paper)',
+                'paper-mid': 'var(--color-paper-mid)',
                 volt: 'var(--volt)',
                 'volt-dim': 'var(--volt-dim)',
-                mist: 'var(--mist)',
+                mist: 'var(--color-mist)',
                 ember: 'var(--ember)',
                 void: 'var(--void)'
             },

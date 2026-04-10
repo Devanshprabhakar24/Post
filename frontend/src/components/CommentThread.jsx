@@ -11,22 +11,22 @@ function CommentCard({ comment, depth, onReply }) {
     const replies = Array.isArray(comment.replies) ? comment.replies : [];
     const canReply = depth < 1;
 
-    const indentClass = useMemo(() => (depth === 0 ? '' : 'ml-8 border-l border-volt/35 pl-4'), [depth]);
+    const indentClass = useMemo(() => (depth === 0 ? '' : 'ml-8 border-l border-[var(--border-soft)] dark:border-volt/35 pl-4'), [depth]);
 
     return (
-        <div className={`space-y-3 rounded-2xl border border-mist/30 bg-ink/35 p-4 ${indentClass}`}>
+        <div className={`space-y-3 rounded-2xl border border-[var(--border-soft)] bg-[var(--bg-card-soft)] p-4 ${indentClass}`}>
             <div className="flex items-start gap-3">
                 <Avatar name={comment.name} />
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-display text-2xl leading-none text-paper">{comment.name}</p>
-                        {comment.email && <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-mist">{comment.email}</p>}
+                        <p className="font-display text-2xl leading-none text-[var(--text-primary)]">{comment.name}</p>
+                        {comment.email && <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-[var(--text-tertiary)]">{comment.email}</p>}
                     </div>
-                    <p className="mt-2 whitespace-pre-line font-body text-base italic leading-7 text-mist">{comment.body}</p>
+                    <p className="mt-2 whitespace-pre-line font-body text-base italic leading-7 text-[var(--text-secondary)]">{comment.body}</p>
                 </div>
             </div>
 
-            <div className="flex items-center gap-2 ui-font text-[10px] uppercase tracking-[0.14em] text-mist">
+            <div className="flex items-center gap-2 ui-font text-[10px] uppercase tracking-[0.14em] text-[var(--text-secondary)]">
                 {canReply && (
                     <Button type="button" variant="ghost" size="sm" onClick={() => setReplyOpen((current) => !current)}>
                         <Reply className="mr-1 h-3.5 w-3.5" /> Reply

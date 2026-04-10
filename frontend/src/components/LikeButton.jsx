@@ -41,8 +41,8 @@ function LikeButton({ isLiked, likes, onToggle, disabled = false }) {
             whileTap={reduced ? undefined : { scale: 0.94 }}
             className={`magnetic-hit relative inline-flex items-center gap-2 rounded-full border px-3 py-1.5 ui-font text-xs tracking-wide transition ${
                 isLiked
-                    ? 'border-volt/80 bg-volt/20 text-paper'
-                    : 'border-mist/45 bg-transparent text-mist hover:border-volt/60 hover:text-paper'
+                    ? 'border-volt/80 bg-volt/20 text-[var(--text-primary)]'
+                    : 'border-[var(--border-soft)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--accent-red)] hover:text-[var(--text-primary)] dark:hover:border-volt'
             } ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
         >
             <span className="relative inline-flex h-5 w-5 items-center justify-center">
@@ -59,7 +59,7 @@ function LikeButton({ isLiked, likes, onToggle, disabled = false }) {
                     transition={reduced ? { duration: 0 } : { duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
                     className="relative z-20"
                 >
-                    <Heart className={`h-4.5 w-4.5 ${isLiked ? 'fill-current text-volt' : 'text-mist'}`} />
+                    <Heart className={`h-[18px] w-[18px] ${isLiked ? 'fill-current text-volt' : 'text-[var(--text-secondary)]'}`} />
                 </motion.span>
 
                 {isLiked && !reduced && (

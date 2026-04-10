@@ -9,8 +9,8 @@ export default function EmptyState({ title = 'NOTHING YET', description = 'Your 
             animate={{ opacity: 1, y: 0 }}
             className="editorial-surface rounded-3xl px-6 py-12 text-center"
         >
-            <h3 className="font-display text-[clamp(3rem,12vw,5rem)] leading-[0.88] text-paper">{title}</h3>
-            <p className="mx-auto mt-4 max-w-xl font-body text-lg italic text-mist">{description}</p>
+            <h3 className="font-display text-[clamp(3rem,12vw,5rem)] leading-[0.88] text-[var(--text-primary)]">{title}</h3>
+            <p className="mx-auto mt-4 max-w-xl font-body text-lg italic text-[var(--text-secondary)]">{description}</p>
             <svg className="mx-auto mt-6 h-3 w-64" viewBox="0 0 256 8" fill="none" aria-hidden="true">
                 <motion.path
                     d="M2 6C74 2 182 2 254 6"

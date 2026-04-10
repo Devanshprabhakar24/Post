@@ -17,7 +17,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }) {
                 type="button"
                 onClick={() => onPageChange(currentPage - 1)}
                 disabled={currentPage <= 1}
-                className="rounded-xl border border-mist/35 bg-ink/30 px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-mist transition hover:border-volt hover:text-volt disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl border border-[var(--border-soft)] bg-[var(--bg-card-soft)] px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-[var(--text-secondary)] transition hover:border-[var(--accent-red)] hover:text-[var(--accent-red)] disabled:cursor-not-allowed disabled:opacity-50 dark:hover:border-volt dark:hover:text-volt"
             >
                 Prev
             </button>
@@ -29,8 +29,8 @@ export default function Pagination({ currentPage, totalPages, onPageChange }) {
                     onClick={() => onPageChange(page)}
                     className={`rounded-xl px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] transition ${
                         page === currentPage
-                            ? 'border border-volt/75 bg-volt text-ink'
-                            : 'border border-mist/35 bg-ink/30 text-mist hover:border-volt hover:text-volt'
+                            ? 'border border-volt/75 bg-volt text-[#090b10]'
+                            : 'border border-[var(--border-soft)] bg-[var(--bg-card-soft)] text-[var(--text-secondary)] hover:border-[var(--accent-red)] hover:text-[var(--accent-red)] dark:hover:border-volt dark:hover:text-volt'
                     }`}
                 >
                     {page}
@@ -41,7 +41,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }) {
                 type="button"
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage >= totalPages}
-                className="rounded-xl border border-mist/35 bg-ink/30 px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-mist transition hover:border-volt hover:text-volt disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-xl border border-[var(--border-soft)] bg-[var(--bg-card-soft)] px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-[var(--text-secondary)] transition hover:border-[var(--accent-red)] hover:text-[var(--accent-red)] disabled:cursor-not-allowed disabled:opacity-50 dark:hover:border-volt dark:hover:text-volt"
             >
                 Next
             </button>

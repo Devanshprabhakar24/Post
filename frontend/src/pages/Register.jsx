@@ -86,7 +86,7 @@ export default function Register() {
                 initial={reduced ? { opacity: 1 } : { opacity: 0, x: 30 }}
                 animate={{ opacity: 1, x: 0 }}
                 onSubmit={onSubmit}
-                className="flex flex-col justify-center gap-3 bg-[#f8f6f2] px-6 py-10 text-[var(--text-primary)]"
+                className="flex flex-col justify-center gap-3 bg-[var(--bg-card)] px-6 py-10 text-[var(--text-primary)]"
             >
                 <h1 className="font-display text-6xl leading-none text-[var(--text-primary)]">REGISTER</h1>
                 <p className="font-body text-lg italic text-[var(--text-secondary)]">Build your profile for the live feed.</p>
@@ -96,7 +96,7 @@ export default function Register() {
                     <input
                         value={form.name}
                         onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                        className="w-full rounded-xl border border-[var(--border-soft)] bg-[rgba(255,255,255,0.26)] px-3 py-2 font-ui text-sm uppercase tracking-[0.06em] text-[var(--text-primary)] focus:border-volt focus:outline-none dark:bg-[rgba(255,255,255,0.03)]"
+                        className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-card-soft)] px-3 py-2 font-ui text-sm uppercase tracking-[0.06em] text-[var(--text-primary)] focus:border-volt focus:outline-none dark:bg-[rgba(255,255,255,0.03)]"
                     />
                 </label>
 
@@ -110,7 +110,7 @@ export default function Register() {
                             setForm((prev) => ({ ...prev, email: value }));
                             setEmailError(isValidEmail(value) ? '' : 'Enter a valid email address');
                         }}
-                        className="w-full rounded-xl border border-[var(--border-soft)] bg-[rgba(255,255,255,0.26)] px-3 py-2 font-ui text-sm tracking-[0.06em] text-[var(--text-primary)] focus:border-volt focus:outline-none dark:bg-[rgba(255,255,255,0.03)]"
+                        className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-card-soft)] px-3 py-2 font-ui text-sm tracking-[0.06em] text-[var(--text-primary)] focus:border-volt focus:outline-none dark:bg-[rgba(255,255,255,0.03)]"
                     />
                     {emailError && <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-[var(--accent-red)]">{emailError}</p>}
                 </label>
@@ -122,7 +122,7 @@ export default function Register() {
                             type={showPassword ? 'text' : 'password'}
                             value={form.password}
                             onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-                            className="w-full rounded-xl border border-[var(--border-soft)] bg-[rgba(255,255,255,0.26)] px-3 py-2 pr-10 font-ui text-sm tracking-[0.06em] text-[var(--text-primary)] focus:border-volt focus:outline-none dark:bg-[rgba(255,255,255,0.03)]"
+                            className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-card-soft)] px-3 py-2 pr-10 font-ui text-sm tracking-[0.06em] text-[var(--text-primary)] focus:border-volt focus:outline-none dark:bg-[rgba(255,255,255,0.03)]"
                         />
                         <button
                             type="button"
@@ -134,13 +134,13 @@ export default function Register() {
                     </div>
                 </label>
 
-                <div className="rounded-xl border border-[var(--border-soft)] p-3">
-                    <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-[var(--bg-card-soft)]">
+                <div className="rounded-xl border border-[var(--border-soft)] bg-[var(--bg-card-soft)] p-3">
+                    <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-[var(--border-soft)]">
                         <span className="block h-full bg-volt" style={{ width: `${(passwordScore / PASSWORD_RULES.length) * 100}%` }} />
                     </div>
                     <div className="grid gap-1">
                         {PASSWORD_RULES.map((rule) => (
-                            <p key={rule.key} className={`ui-font text-[10px] uppercase tracking-[0.14em] ${passwordState.checks[rule.key] ? 'text-[#7e9200]' : 'text-[var(--text-tertiary)]'}`}>
+                            <p key={rule.key} className={`ui-font text-[10px] uppercase tracking-[0.14em] ${passwordState.checks[rule.key] ? 'text-[var(--accent-green)]' : 'text-[var(--text-tertiary)]'}`}>
                                 {passwordState.checks[rule.key] ? '✓' : '•'} {rule.label}
                             </p>
                         ))}
@@ -156,7 +156,7 @@ export default function Register() {
                                 setForm((prev) => ({ ...prev, otp: event.target.value }));
                                 setOtpError('');
                             }}
-                            className="w-full rounded-xl border border-[var(--border-soft)] bg-[rgba(255,255,255,0.26)] px-3 py-2 font-ui text-sm uppercase tracking-[0.06em] text-[var(--text-primary)] focus:border-volt focus:outline-none dark:bg-[rgba(255,255,255,0.03)]"
+                            className="w-full rounded-xl border border-[var(--border-soft)] bg-[var(--bg-card-soft)] px-3 py-2 font-ui text-sm uppercase tracking-[0.06em] text-[var(--text-primary)] focus:border-volt focus:outline-none dark:bg-[rgba(255,255,255,0.03)]"
                         />
                         {otpError && <p className="ui-font text-[10px] uppercase tracking-[0.14em] text-[var(--accent-red)]">{otpError}</p>}
                     </label>
@@ -175,7 +175,7 @@ export default function Register() {
                 </motion.button>
 
                 <p className="ui-font text-xs uppercase tracking-[0.12em] text-[var(--text-secondary)]">
-                    Already have an account? <Link to="/login" className="text-[#7e9200]">Login</Link>
+                    Already have an account? <Link to="/login" className="text-volt hover:underline">Login</Link>
                 </p>
             </motion.form>
         </section>

@@ -270,7 +270,7 @@ export default function Profile() {
 
     return (
         <motion.section initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-            <div className="relative overflow-hidden rounded-3xl border border-mist/30">
+            <div className="relative overflow-hidden rounded-3xl border border-[var(--border-soft)]">
                 <div className="h-56 w-full" style={{ background: hashGradient(profileUser?.username || profileUser?.name) }} />
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(200,241,53,0.22),transparent_40%)]" />
 
@@ -292,7 +292,7 @@ export default function Profile() {
                         <div className="flex flex-wrap gap-2">
                             {isOwnProfile && (
                                 <>
-                                    <label className="cursor-pointer rounded-full border border-mist/45 px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-mist hover:border-volt hover:text-volt">
+                                    <label className="cursor-pointer rounded-full border border-[var(--border-soft)] px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-[var(--text-secondary)] hover:border-[var(--accent-red)] hover:text-[var(--accent-red)]">
                                         Choose photo
                                         <input type="file" accept="image/*" onChange={handleProfilePhotoChange} className="hidden" />
                                     </label>
@@ -301,7 +301,7 @@ export default function Profile() {
                                             type="button"
                                             onClick={handleUploadProfilePhoto}
                                             disabled={uploadingPhoto}
-                                            className="rounded-full border border-volt/70 bg-volt px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-ink disabled:opacity-60"
+                                            className="rounded-full border border-volt/70 bg-volt px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-[#090b10] disabled:opacity-60"
                                         >
                                             {uploadingPhoto ? 'Uploading...' : 'Upload'}
                                         </button>
@@ -330,7 +330,7 @@ export default function Profile() {
 
             <div className="columns-1 gap-4 md:columns-2">
                 {posts.length === 0 ? (
-                    <p className="font-body italic text-mist">No posts yet.</p>
+                    <p className="font-body italic text-[var(--text-secondary)]">No posts yet.</p>
                 ) : (
                     posts.map((post, index) => (
                         <PostCard
@@ -354,7 +354,7 @@ export default function Profile() {
             </div>
 
             <div className="flex justify-end">
-                <Link to="/" className="rounded-full border border-mist/35 px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-mist hover:border-volt hover:text-volt">
+                <Link to="/" className="rounded-full border border-[var(--border-soft)] px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-[var(--text-secondary)] hover:border-[var(--accent-red)] hover:text-[var(--accent-red)]">
                     Back to feed
                 </Link>
             </div>

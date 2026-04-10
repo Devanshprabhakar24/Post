@@ -12,7 +12,7 @@ export default function Loader({ count = 6 }) {
                     {letters.map((letter, index) => (
                         <motion.span
                             key={`${letter}-${index}`}
-                            className="font-display text-5xl text-paper"
+                            className="font-display text-5xl text-[var(--text-primary)]"
                             animate={
                                 reduced
                                     ? { opacity: 1, y: 0 }
@@ -34,7 +34,7 @@ export default function Loader({ count = 6 }) {
             </div>
 
             {Array.from({ length: count }).map((_, index) => (
-                <div key={index} className="skeleton h-48 rounded-2xl border border-mist/20" />
+                <div key={index} className="skeleton h-48 rounded-2xl border border-[var(--border-soft)]/40" />
             ))}
         </div>
     );

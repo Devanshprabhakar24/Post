@@ -4,7 +4,7 @@ function Card({ className, ...props }) {
     return (
         <div
             className={cn(
-                'rounded-3xl border border-mist/35 bg-ink-soft/80 backdrop-blur-xl shadow-soft',
+                'rounded-3xl border border-[var(--border-soft)] bg-[var(--bg-card)] backdrop-blur-xl shadow-[var(--shadow-editorial)]',
                 className
             )}
             {...props}

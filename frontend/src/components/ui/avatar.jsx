@@ -8,7 +8,7 @@ function Avatar({ className, name, src = '', online = false }) {
     return (
         <div
             className={cn(
-                'relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-mist/35 bg-gradient-to-br from-volt/55 via-volt-soft/45 to-ember/45 text-xs font-semibold text-ink',
+                'relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[var(--border-soft)] bg-gradient-to-br from-volt/55 via-volt-soft/45 to-ember/45 text-xs font-semibold text-[var(--text-primary)]',
                 className
             )}
         >
@@ -18,7 +18,7 @@ function Avatar({ className, name, src = '', online = false }) {
                 first || <User2 className="h-4 w-4" />
             )}
             {online && (
-                <span className="absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 border-ink-soft bg-volt" />
+                <span className="absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 border-[var(--bg-card)] bg-volt" />
             )}
         </div>
     );

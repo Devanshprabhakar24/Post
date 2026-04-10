@@ -6,10 +6,10 @@ const buttonVariants = cva(
     {
         variants: {
             variant: {
-                default: 'border border-volt/70 bg-volt text-ink shadow-soft hover:-translate-y-[1px] hover:bg-volt-soft',
-                ghost: 'border border-mist/35 bg-transparent text-mist hover:border-volt/65 hover:text-paper',
-                secondary: 'border border-mist/35 bg-paper/6 text-paper hover:border-mist/60 hover:bg-paper/10',
-                danger: 'border border-ember/70 bg-ember/90 text-paper hover:-translate-y-[1px] hover:bg-ember'
+                default: 'border border-volt/70 bg-volt text-[#090b10] shadow-soft hover:-translate-y-[1px] hover:opacity-90',
+                ghost: 'border border-[var(--border-soft)] bg-transparent text-[var(--text-secondary)] hover:border-[var(--accent-red)]/65 hover:text-[var(--text-primary)]',
+                secondary: 'border border-[var(--border-soft)] bg-[var(--bg-card-soft)] text-[var(--text-primary)] hover:border-[var(--border-soft)] hover:bg-[var(--bg-card-soft)]',
+                danger: 'border border-[var(--accent-red)]/70 bg-[var(--accent-red)] text-white hover:-translate-y-[1px] hover:opacity-90'
             },
             size: {
                 default: 'h-10 px-5',

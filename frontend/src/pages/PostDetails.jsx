@@ -159,12 +159,12 @@ export default function PostDetails() {
 
     if (error) {
         return (
-            <div className="rounded-2xl border border-ember/45 bg-ember/10 p-6 text-center">
-                <p className="font-body text-lg italic text-ember">{error}</p>
+            <div className="rounded-2xl border border-[var(--accent-red)]/40 bg-[var(--accent-red)]/8 p-6 text-center">
+                <p className="font-body text-lg italic text-[var(--accent-red)]">{error}</p>
                 <button
                     type="button"
                     onClick={() => navigate('/')}
-                    className="mt-4 rounded-full border border-mist/40 px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-mist"
+                    className="mt-4 rounded-full border border-[var(--border-soft)] px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-[var(--text-secondary)] hover:border-[var(--accent-red)] hover:text-[var(--accent-red)]"
                 >
                     Back to feed
                 </button>
@@ -181,17 +181,17 @@ export default function PostDetails() {
             <ReadingProgress />
             <motion.article initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} className="mx-auto max-w-5xl space-y-8">
                 <header className="space-y-3">
-                    <Link to="/" className="ui-font text-xs uppercase tracking-[0.14em] text-volt">Back to feed</Link>
-                    <h1 className="font-display text-[clamp(3rem,9vw,5.4rem)] leading-[0.88] text-paper">{post.title}</h1>
-                    <div className="flex items-center justify-between gap-3 border-b border-mist/30 pb-3">
+                    <Link to="/" className="ui-font text-xs uppercase tracking-[0.14em] text-[var(--accent-red)] hover:underline">Back to feed</Link>
+                    <h1 className="font-display text-[clamp(3rem,9vw,5.4rem)] leading-[0.88] text-[var(--text-primary)]">{post.title}</h1>
+                    <div className="flex items-center justify-between gap-3 border-b border-[var(--border-soft)] pb-3">
                         <div className="inline-flex items-center gap-3">
                             <Avatar
                                 name={post.authorName || post.author?.name}
                                 src={post.author?.profilePic || post.author?.imageUrl || ''}
                                 online={Boolean(post.author?.isOnline)}
-                                className="h-10 w-10 border border-volt/40"
+                                className="h-10 w-10 border border-[var(--border-soft)]"
                             />
-                            <span className="ui-font text-xs uppercase tracking-[0.14em] text-mist">
+                            <span className="ui-font text-xs uppercase tracking-[0.14em] text-[var(--text-secondary)]">
                                 @{post.authorUsername || post.author?.username || `user-${post.userId}`}
                             </span>
                         </div>
@@ -200,14 +200,14 @@ export default function PostDetails() {
                 </header>
 
                 <section className="mx-auto max-w-[680px]">
-                    <p className="whitespace-pre-line font-body text-xl leading-9 text-paper">{post.body}</p>
+                    <p className="whitespace-pre-line font-body text-xl leading-9 text-[var(--text-primary)]">{post.body}</p>
                     {post.imageUrl && <img src={post.imageUrl} alt={post.title} className="mt-6 max-h-[38rem] w-full rounded-2xl object-cover" />}
                 </section>
 
                 <section className="space-y-4">
-                    <h2 className="font-display text-5xl text-paper">Comments ({commentCount})</h2>
+                    <h2 className="font-display text-5xl text-[var(--text-primary)]">Comments ({commentCount})</h2>
 
-                    <div className="rounded-2xl border border-mist/35 p-4">
+                    <div className="rounded-2xl border border-[var(--border-soft)] p-4">
                         <ReplyForm placeholder="Share your thoughts..." submitLabel="Post comment" onSubmit={handleAddComment} />
                     </div>
 
