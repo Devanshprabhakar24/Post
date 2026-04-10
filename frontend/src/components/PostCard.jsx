@@ -68,7 +68,11 @@ function PostCard({
     isLive = false,
     onOpenComments,
     onRepost,
-    onShare
+    onShare,
+    onFollowUser,
+    showFollowButton = false,
+    isFollowing = false,
+    isFollowLoading = false
 }) {
     const navigate = useNavigate();
     const displayName = post?.authorName || post?.author?.name || `User ${post?.userId}`;
@@ -224,6 +228,20 @@ function PostCard({
                         <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">{timeAgo} · 🌐 Public</p>
                     </div>
                 </div>
+                {showFollowButton && !isOwnPost && typeof onFollowUser === 'function' && (
+                    <button
+                        type="button"
+                        onClick={() => onFollowUser(post)}
+                        disabled={isFollowLoading}
+                        className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition ${
+                            isFollowing
+                                ? 'border-[var(--border-soft)] text-[var(--text-secondary)] hover:border-[var(--accent-red)]/40 hover:text-[var(--accent-red)]'
+                                : 'border-[var(--accent-red)] bg-[var(--accent-red)] text-white hover:opacity-90'
+                        } disabled:cursor-not-allowed disabled:opacity-60`}
+                    >
+                        {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
+                    </button>
+                )}
             </div>
 
             {/* Post Text */}

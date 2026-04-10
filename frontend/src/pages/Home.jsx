@@ -15,8 +15,10 @@ import {
     fetchPosts,
     searchPosts,
     fetchUsers,
+    followUser,
     likePost,
     syncPosts,
+    unfollowUser,
     unlikePost
 } from '../services/api';
 import { emitSearch, joinPost, onCommentCreated, onLikeUpdated, onNewPost, onSearchResults } from '../services/socket';
@@ -172,6 +174,8 @@ export default function Home({
     const [composerImageFile, setComposerImageFile] = useState(null);
     const [composerImagePreview, setComposerImagePreview] = useState('');
     const [livePulseIds, setLivePulseIds] = useState({});
+    const [followingUserIds, setFollowingUserIds] = useState(() => new Set((Array.isArray(user?.following) ? user.following : []).map(Number).filter(Number.isFinite)));
+    const [followLoadingIds, setFollowLoadingIds] = useState(new Set());
 
     const debouncedQuery = useDebounce(query, 300);
 
@@ -182,6 +186,11 @@ export default function Home({
     useEffect(() => {
         commentsCacheRef.current = commentCounts;
     }, [commentCounts]);
+
+    useEffect(() => {
+        const ids = (Array.isArray(user?.following) ? user.following : []).map(Number).filter(Number.isFinite);
+        setFollowingUserIds(new Set(ids));
+    }, [user?.following]);
 
     useEffect(() => {
         postsCacheRef.current = posts;
@@ -554,6 +563,58 @@ export default function Home({
         }
     }, [currentUserId, posts, searchResults, user?.userId]);
 
+    const handleFollowUser = useCallback(async (targetPost) => {
+        const targetUserId = Number(targetPost?.userId);
+        if (!Number.isFinite(targetUserId) || targetUserId < 1 || targetUserId === currentUserId) {
+            return;
+        }
+
+        const shouldFollow = !followingUserIds.has(targetUserId);
+
+        setFollowLoadingIds((prev) => {
+            const next = new Set(prev);
+            next.add(targetUserId);
+            return next;
+        });
+
+        setFollowingUserIds((prev) => {
+            const next = new Set(prev);
+            if (shouldFollow) {
+                next.add(targetUserId);
+            } else {
+                next.delete(targetUserId);
+            }
+            return next;
+        });
+
+        try {
+            if (shouldFollow) {
+                await followUser(targetUserId);
+                toast.success('User followed');
+            } else {
+                await unfollowUser(targetUserId);
+                toast.success('User unfollowed');
+            }
+        } catch (error) {
+            setFollowingUserIds((prev) => {
+                const next = new Set(prev);
+                if (shouldFollow) {
+                    next.delete(targetUserId);
+                } else {
+                    next.add(targetUserId);
+                }
+                return next;
+            });
+            toast.error(error?.message || 'Failed to update follow');
+        } finally {
+            setFollowLoadingIds((prev) => {
+                const next = new Set(prev);
+                next.delete(targetUserId);
+                return next;
+            });
+        }
+    }, [currentUserId, followingUserIds]);
+
     const handleCreatePost = async (event) => {
         event.preventDefault();
         if (!composer.title.trim() || !composer.body.trim()) {
@@ -724,6 +785,10 @@ export default function Home({
                                 isOwnPost={String(post.userId) === String(user?.userId)}
                                 onDelete={handleDeletePost}
                                 onOpenComments={() => handleOpenDetails(post.postId)}
+                                showFollowButton={!isOwnPost}
+                                isFollowing={followingUserIds.has(Number(post.userId))}
+                                isFollowLoading={followLoadingIds.has(Number(post.userId))}
+                                onFollowUser={handleFollowUser}
                                 onRepost={async (targetPost) => {
                                     const url = `${window.location.origin}/posts/${targetPost.postId}`;
                                     if (navigator?.clipboard?.writeText) {
@@ -747,7 +812,6 @@ export default function Home({
                                     }
                                     toast.success('Post link copied');
                                 }}
-                                onFollowUser={(targetPost) => navigate(`/profile/${targetPost.userId}`)}
                                 onTagClick={(tag) => navigate(`/hashtags/${String(tag || '').toLowerCase()}`)}
                                 isLive={Boolean(livePulseIds[post.postId])}
                             />

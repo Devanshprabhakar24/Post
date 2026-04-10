@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { followUser, unfollowUser } from '../services/api';
 
 function getTrendingHashtags(posts) {
     const countMap = new Map();
@@ -31,6 +33,13 @@ function getTrendingHashtags(posts) {
 
 export default function RightPanel({ users = [], posts = [] }) {
     const { user } = useAuth();
+    const [followingIds, setFollowingIds] = useState(() => new Set((Array.isArray(user?.following) ? user.following : []).map(Number).filter(Number.isFinite)));
+    const [loadingIds, setLoadingIds] = useState(new Set());
+
+    useEffect(() => {
+        const ids = (Array.isArray(user?.following) ? user.following : []).map(Number).filter(Number.isFinite);
+        setFollowingIds(new Set(ids));
+    }, [user?.following]);
 
     const trendingHashtags = useMemo(() => {
         const computed = getTrendingHashtags(posts);
@@ -64,6 +73,60 @@ export default function RightPanel({ users = [], posts = [] }) {
     const getAvatarColor = (userId) => {
         const colors = ['#7b1fa2', '#00695c', '#d32f2f', '#5c6bc0', '#ef6c00', '#f4511e'];
         return colors[Number(userId || 0) % colors.length];
+    };
+
+    const handleToggleFollow = async (targetUserId) => {
+        const normalizedId = Number(targetUserId);
+        const currentUserId = Number(user?.userId);
+
+        if (!Number.isFinite(normalizedId) || normalizedId < 1 || normalizedId === currentUserId) {
+            return;
+        }
+
+        const shouldFollow = !followingIds.has(normalizedId);
+
+        setLoadingIds((prev) => {
+            const next = new Set(prev);
+            next.add(normalizedId);
+            return next;
+        });
+
+        setFollowingIds((prev) => {
+            const next = new Set(prev);
+            if (shouldFollow) {
+                next.add(normalizedId);
+            } else {
+                next.delete(normalizedId);
+            }
+            return next;
+        });
+
+        try {
+            if (shouldFollow) {
+                await followUser(normalizedId);
+                toast.success('User followed');
+            } else {
+                await unfollowUser(normalizedId);
+                toast.success('User unfollowed');
+            }
+        } catch (error) {
+            setFollowingIds((prev) => {
+                const next = new Set(prev);
+                if (shouldFollow) {
+                    next.delete(normalizedId);
+                } else {
+                    next.add(normalizedId);
+                }
+                return next;
+            });
+            toast.error(error?.message || 'Failed to update follow');
+        } finally {
+            setLoadingIds((prev) => {
+                const next = new Set(prev);
+                next.delete(normalizedId);
+                return next;
+            });
+        }
     };
 
     return (
@@ -100,6 +163,18 @@ export default function RightPanel({ users = [], posts = [] }) {
                                     <p className="truncate text-[12px] font-semibold text-[var(--text-primary)]">{entry.name}</p>
                                     <p className="text-[10px] text-[var(--text-tertiary)]">@{entry.username}</p>
                                 </div>
+                                <button
+                                    type="button"
+                                    onClick={() => handleToggleFollow(entry.userId)}
+                                    disabled={loadingIds.has(Number(entry.userId))}
+                                    className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold transition ${
+                                        followingIds.has(Number(entry.userId))
+                                            ? 'border-[var(--border-soft)] text-[var(--text-secondary)] hover:border-[var(--accent-red)]/40 hover:text-[var(--accent-red)]'
+                                            : 'border-[var(--accent-red)] bg-[var(--accent-red)] text-white hover:opacity-90'
+                                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                                >
+                                    {loadingIds.has(Number(entry.userId)) ? '...' : (followingIds.has(Number(entry.userId)) ? 'Following' : 'Follow')}
+                                </button>
                             </div>
                         );
                     }) : (
