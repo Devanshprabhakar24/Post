@@ -374,18 +374,7 @@ NODE_ENV=production
 3. Set environment variables in Render dashboard
 4. Deploy
 
-### Railway.sh Deployment
-
-1. Link GitHub repo
-2. Add environment variables
-3. Deploy automatically on push
-
-### Deploying on Vercel (REST only)
-
-For Serverless deployment (WebSocket not supported):
-
-- Use `/api/posts/fetch` endpoint in scheduled function
-- Export REST routes only
+Frontend should be deployed separately to **Vercel** and pointed at this backend with `VITE_API_URL` and `VITE_WS_URL`.
 
 ## Troubleshooting
 

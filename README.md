@@ -211,13 +211,15 @@ Deploy to **Vercel**:
 
 1. Connect GitHub repository
 2. Set Root Directory to `frontend`
-3. Set environment variables
+3. Set environment variables:
+  - `VITE_API_URL`: `https://<your-render-backend>.onrender.com`
+  - `VITE_WS_URL`: `wss://<your-render-backend>.onrender.com`
 4. Deploy automatically on push
 
 ### Live URLs
 
-- **Frontend**: [not deployed yet]
-- **Backend**: [not deployed yet]
+- **Frontend**: Vercel
+- **Backend**: Render
 
 ## 📊 Performance Features
 
