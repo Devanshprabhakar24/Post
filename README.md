@@ -170,7 +170,136 @@ npm run dev
 
 App runs on `http://localhost:5173`
 
-## 📡 API Endpoints
+## � Test Login & Registration
+
+### Register New Account
+
+1. Navigate to `http://localhost:5173/register`
+2. Fill in the form:
+   - **Username**: Any username (3+ characters, alphanumeric + underscore)
+   - **Email**: Any email address
+   - **Password**: Any password (6+ characters)
+3. Click "Register"
+4. You'll receive a JWT token and be redirected to home
+
+**Example**:
+
+```
+Username: testuser123
+Email: test@example.com
+Password: password123
+```
+
+### Login with Test Account
+
+1. Navigate to `http://localhost:5173/login`
+2. Use credentials from registration:
+   - **Email**: test@example.com
+   - **Password**: password123
+3. Click "Login"
+4. Token will be stored in `localStorage` and attached to all API requests
+
+### Demo Credentials (If Database Pre-Populated)
+
+If you've run `SEED_ON_START=true`, test accounts are auto-created:
+
+| Username | Email            | Password    |
+| -------- | ---------------- | ----------- |
+| alice    | alice@test.com   | password123 |
+| bob      | bob@test.com     | password123 |
+| charlie  | charlie@test.com | password123 |
+
+### Authentication Flow (Behind the Scenes)
+
+```
+1. User submits login/register form
+   ↓
+2. Frontend POST to /api/auth/login or /api/auth/register
+   ↓
+3. Backend validates credentials
+   - Email uniqueness check
+   - Password strength validation
+   - Existing user verification
+   ↓
+4. Backend creates JWT token
+   - Payload: { userId, issued_at, expiration }
+   - Expires: 7 days
+   ↓
+5. Frontend receives token
+   ↓
+6. Token stored in localStorage
+   Key: 'token'
+   Value: 'eyJhbGciOiJIUzI1NiIsInR5...'
+   ↓
+7. Axios interceptor auto-adds to all requests
+   Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5...
+   ↓
+8. All API endpoints verify token
+   - Check signature
+   - Check expiration
+   ↓
+9. Authenticated requests proceed
+```
+
+### Testing API with Token
+
+**Using cURL**:
+
+```bash
+# Register
+curl -X POST http://localhost:8000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "testuser",
+    "email": "test@example.com",
+    "password": "password123"
+  }'
+
+# Login
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "password123"
+  }'
+
+# Response includes token:
+# { "token": "eyJh...", "user": { ... } }
+
+# Use token in protected endpoint
+curl -X GET http://localhost:8000/api/posts \
+  -H "Authorization: Bearer eyJh..."
+```
+
+**Using Postman**:
+
+1. Set request to `POST http://localhost:8000/api/auth/login`
+2. Go to "Body" → select "raw" → "JSON"
+3. Paste:
+
+```json
+{
+  "email": "test@example.com",
+  "password": "password123"
+}
+```
+
+4. Send request
+5. Copy the `token` from response
+6. For authenticated requests:
+   - Go to "Headers" tab
+   - Add: `Authorization` = `Bearer <token>`
+   - Make request
+
+### Logout & Token Cleanup
+
+```javascript
+// Frontend logout
+localStorage.removeItem("token");
+// Token automatically removed from all future requests
+```
+
+## �📡 API Endpoints
 
 ### Authentication
 
