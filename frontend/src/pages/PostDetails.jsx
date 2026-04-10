@@ -18,13 +18,30 @@ import {
     replyToComment,
     unlikePost
 } from '../services/api';
-import { joinPost, onLikeUpdated } from '../services/socket';
+import { joinPost, onCommentCreated, onLikeUpdated } from '../services/socket';
+
+function appendReplyToTree(list, parentCommentId, reply) {
+    return (Array.isArray(list) ? list : []).map((entry) => {
+        if (Number(entry.commentId) === Number(parentCommentId)) {
+            const replies = Array.isArray(entry.replies) ? entry.replies : [];
+            return {
+                ...entry,
+                replies: [...replies, reply]
+            };
+        }
+
+        return {
+            ...entry,
+            replies: appendReplyToTree(entry.replies, parentCommentId, reply)
+        };
+    });
+}
 
 export default function PostDetails() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
-    const currentUserId = String(user?.userId || '');
+    const currentUserId = Number(user?.userId || 0);
 
     const [post, setPost] = useState(null);
     const [comments, setComments] = useState([]);
@@ -49,7 +66,9 @@ export default function PostDetails() {
 
             try {
                 const [postData, thread] = await Promise.all([fetchPostById(id), fetchPostComments(id)]);
-                const likeStatus = await getLikeStatus(id, currentUserId).catch(() => null);
+                const likeStatus = currentUserId
+                    ? await getLikeStatus(id, currentUserId).catch(() => null)
+                    : null;
 
                 if (!active) {
                     return;
@@ -98,12 +117,40 @@ export default function PostDetails() {
                     ...current,
                     likes: Number(payload.totalLikes) || 0,
                     likedBy,
-                    isLiked: likedBy.includes(currentUserId)
+                    isLiked: likedBy.map(Number).includes(Number(currentUserId))
                 };
             });
         });
 
-        return () => stopLikeUpdated();
+        const stopCommentCreated = onCommentCreated((payload) => {
+            if (!payload?.postId || Number(payload.postId) !== Number(id)) {
+                return;
+            }
+
+            const incoming = payload?.comment;
+            if (!incoming?.commentId) {
+                return;
+            }
+
+            if (Number(payload?.parentCommentId) > 0) {
+                setComments((current) => appendReplyToTree(current, payload.parentCommentId, { ...incoming, replies: [] }));
+                return;
+            }
+
+            setComments((current) => {
+                const list = Array.isArray(current) ? current : [];
+                if (list.some((entry) => Number(entry.commentId) === Number(incoming.commentId))) {
+                    return list;
+                }
+
+                return [...list, { ...incoming, replies: [] }];
+            });
+        });
+
+        return () => {
+            stopLikeUpdated();
+            stopCommentCreated();
+        };
     }, [currentUserId, id]);
 
     const handleLikeToggle = async () => {

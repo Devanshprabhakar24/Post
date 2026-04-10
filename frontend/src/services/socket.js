@@ -30,9 +30,22 @@ const SOCKET_OPTIONS = import.meta.env.DEV
 let socket = null;
 let searchSocket = null;
 let presenceSocket = null;
+let identifiedUserId = null;
+const joinedPostRooms = new Set();
 
 function createFeedSocket() {
-    return io(`${SOCKET_URL}/feed`, SOCKET_OPTIONS);
+    const instance = io(`${SOCKET_URL}/feed`, SOCKET_OPTIONS);
+    instance.on('connect', () => {
+        if (identifiedUserId) {
+            instance.emit('identify', { userId: identifiedUserId });
+        }
+
+        joinedPostRooms.forEach((postId) => {
+            instance.emit('joinPost', postId);
+        });
+    });
+
+    return instance;
 }
 
 function createSearchSocket() {
@@ -40,7 +53,14 @@ function createSearchSocket() {
 }
 
 function createPresenceSocket() {
-    return io(`${SOCKET_URL}/presence`, SOCKET_OPTIONS);
+    const instance = io(`${SOCKET_URL}/presence`, SOCKET_OPTIONS);
+    instance.on('connect', () => {
+        if (identifiedUserId) {
+            instance.emit('identify', { userId: identifiedUserId });
+        }
+    });
+
+    return instance;
 }
 
 function ensureSockets() {
@@ -74,64 +94,72 @@ function connectSocket() {
 }
 
 function onSearchResults(handler) {
-    if (!searchSocket) {
-        return () => { };
-    }
+    ensureSockets();
 
     searchSocket.on('results', handler);
     return () => searchSocket.off('results', handler);
 }
 
 function emitSearch(query, debounceMs = 300) {
+    ensureSockets();
     searchSocket?.emit('search', { query, debounceMs });
 }
 
 function onLikeUpdated(handler) {
-    if (!socket) {
-        return () => { };
-    }
+    ensureSockets();
 
     socket.on('likeUpdated', handler);
     return () => socket.off('likeUpdated', handler);
 }
 
 function onNewPost(handler) {
-    if (!socket) {
-        return () => { };
-    }
+    ensureSockets();
 
     socket.on('newPost', handler);
     return () => socket.off('newPost', handler);
 }
 
 function onUserOnline(handler) {
-    if (!presenceSocket) {
-        return () => { };
-    }
+    ensureSockets();
 
     presenceSocket.on('userOnline', handler);
     return () => presenceSocket.off('userOnline', handler);
 }
 
 function onUserOffline(handler) {
-    if (!presenceSocket) {
-        return () => { };
-    }
+    ensureSockets();
 
     presenceSocket.on('userOffline', handler);
     return () => presenceSocket.off('userOffline', handler);
 }
 
 function identifyUser(userId) {
-    socket?.emit('identify', { userId });
-    presenceSocket?.emit('identify', { userId });
+    ensureSockets();
+    const normalizedUserId = Number(userId);
+    if (!normalizedUserId) {
+        return;
+    }
+
+    identifiedUserId = normalizedUserId;
+    socket?.emit('identify', { userId: normalizedUserId });
+    presenceSocket?.emit('identify', { userId: normalizedUserId });
 }
 
 function joinPost(postId) {
-    socket?.emit('joinPost', postId);
+    ensureSockets();
+    const normalizedPostId = Number(postId);
+    if (!normalizedPostId) {
+        return;
+    }
+
+    joinedPostRooms.add(normalizedPostId);
+    socket?.emit('joinPost', normalizedPostId);
 }
 
 function disconnectSocket() {
+    identifiedUserId = null;
+    joinedPostRooms.clear();
+
     if (socket) {
         socket.removeAllListeners();
         socket.disconnect();
@@ -152,12 +180,17 @@ function disconnectSocket() {
 }
 
 function onNotification(handler) {
-    if (!socket) {
-        return () => { };
-    }
+    ensureSockets();
 
     socket.on('notification', handler);
     return () => socket.off('notification', handler);
 }
 
-export { socket, connectSocket, onSearchResults, emitSearch, onLikeUpdated, onNewPost, onUserOnline, onUserOffline, onNotification, joinPost, identifyUser, disconnectSocket };
+function onCommentCreated(handler) {
+    ensureSockets();
+
+    socket.on('commentCreated', handler);
+    return () => socket.off('commentCreated', handler);
+}
+
+export { socket, connectSocket, onSearchResults, emitSearch, onLikeUpdated, onNewPost, onCommentCreated, onUserOnline, onUserOffline, onNotification, joinPost, identifyUser, disconnectSocket };

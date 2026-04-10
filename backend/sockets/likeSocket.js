@@ -47,7 +47,7 @@ function emitLikeUpdated(payload) {
             postId,
             setTimeout(() => {
                 flushPostLike(postId);
-            }, 1000)
+            }, 250)
         );
     }
 }

@@ -4,6 +4,7 @@ const User = require('../models/User');
 const { buildCommentTree } = require('../utils/commentThreads');
 const cache = require('../utils/cache');
 const { createNotification } = require('../services/notificationService');
+const { emitCommentCreated } = require('../sockets/commentSocket');
 
 function buildCacheKey(prefix, value) {
     return `${prefix}:${value}`;
@@ -225,6 +226,15 @@ async function createPostComment(req, res) {
             message: `${actorName} commented on your post`
         });
 
+        emitCommentCreated({
+            event: 'comment',
+            postId,
+            comment: {
+                ...created.toObject(),
+                replies: []
+            }
+        });
+
         return res.status(201).json({
             success: true,
             data: { ...created.toObject(), replies: [] },
@@ -295,6 +305,16 @@ async function createReply(req, res) {
             postId: parentComment.postId,
             type: 'reply',
             message: `${actorName} replied to your comment`
+        });
+
+        emitCommentCreated({
+            event: 'reply',
+            postId: parentComment.postId,
+            parentCommentId: parentComment.commentId,
+            comment: {
+                ...created.toObject(),
+                replies: []
+            }
         });
 
         return res.status(201).json({

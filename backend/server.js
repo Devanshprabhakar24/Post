@@ -10,6 +10,7 @@ const { attachSearchSocket } = require('./sockets/searchSocket');
 const { attachLikeSocket } = require('./sockets/likeSocket');
 const { attachNotificationSocket } = require('./sockets/notificationSocket');
 const { attachPostSocket } = require('./sockets/postSocket');
+const { attachCommentSocket } = require('./sockets/commentSocket');
 const { attachPresenceSocket } = require('./sockets/presenceSocket');
 const { startSyncCronJob } = require('./jobs/syncCron');
 const { startLikeFlushJob } = require('./jobs/likeFlushJob');
@@ -62,6 +63,88 @@ async function upsertData(Model, items, idField, normalizeFn) {
         upserted: result.upsertedCount,
         modified: result.modifiedCount
     };
+}
+
+async function seedInitialDataIfNeeded() {
+    console.log('\n📊 Seeding data from JSONPlaceholder API...');
+
+    try {
+        const [postCount, userCount, commentCount] = await Promise.all([
+            Post.estimatedDocumentCount(),
+            User.estimatedDocumentCount(),
+            Comment.estimatedDocumentCount()
+        ]);
+
+        if (postCount === 0) {
+            console.log('  ⬇️  Fetching posts...');
+            const postsResult = await apiService.fetchPosts();
+            if (postsResult.success) {
+                const postsSummary = await upsertData(
+                    Post,
+                    postsResult.data,
+                    'postId',
+                    (p) => ({ id: p.id, postId: p.id, userId: p.userId, title: p.title, body: p.body, isExternal: true })
+                );
+                console.log(`  ✓ Posts seeded: ${postsSummary.upserted} upserted, ${postsSummary.modified} modified`);
+            }
+        } else {
+            console.log(`  ✓ Posts already exist (${postCount} documents)`);
+        }
+
+        if (userCount === 0) {
+            console.log('  ⬇️  Fetching users...');
+            const usersResult = await apiService.fetchUsers();
+            if (usersResult.success) {
+                const usersSummary = await upsertData(
+                    User,
+                    usersResult.data,
+                    'userId',
+                    (u) => ({
+                        id: u.id,
+                        userId: u.id,
+                        name: u.name,
+                        username: u.username,
+                        email: u.email,
+                        address: u.address || {},
+                        phone: u.phone || '',
+                        website: u.website || '',
+                        company: u.company || {},
+                        isExternal: true
+                    })
+                );
+                console.log(`  ✓ Users seeded: ${usersSummary.upserted} upserted, ${usersSummary.modified} modified`);
+            }
+        } else {
+            console.log(`  ✓ Users already exist (${userCount} documents)`);
+        }
+
+        if (commentCount === 0) {
+            console.log('  ⬇️  Fetching comments...');
+            const commentsResult = await apiService.fetchComments();
+            if (commentsResult.success) {
+                const commentsSummary = await upsertData(
+                    Comment,
+                    commentsResult.data,
+                    'commentId',
+                    (c) => ({
+                        id: c.id,
+                        commentId: c.id,
+                        userId: c.userId || c.postId || 1,
+                        postId: c.postId,
+                        parentCommentId: c.parentCommentId ?? null,
+                        name: c.name,
+                        email: c.email,
+                        body: c.body
+                    })
+                );
+                console.log(`  ✓ Comments seeded: ${commentsSummary.upserted} upserted, ${commentsSummary.modified} modified`);
+            }
+        } else {
+            console.log(`  ✓ Comments already exist (${commentCount} documents)`);
+        }
+    } catch (seedError) {
+        console.error('⚠️  Error during data seeding:', seedError.message);
+    }
 }
 
 /**
@@ -129,6 +212,7 @@ async function bootstrap() {
         attachLikeSocket(feedNamespace);
         attachNotificationSocket(feedNamespace);
         attachPostSocket(feedNamespace);
+        attachCommentSocket(feedNamespace);
         attachPresenceSocket(presenceNamespace);
 
         io.on('connection', () => {
@@ -145,88 +229,6 @@ async function bootstrap() {
         const cronTask = startSyncCronJob();
         const likeFlushJob = startLikeFlushJob();
         startUploadWorker();
-
-        // Seed data from external API on startup
-        console.log('\n📊 Seeding data from JSONPlaceholder API...');
-
-        try {
-            // Check if data already exists
-            const [postCount, userCount, commentCount] = await Promise.all([
-                Post.countDocuments(),
-                User.countDocuments(),
-                Comment.countDocuments()
-            ]);
-
-            if (postCount === 0) {
-                console.log('  ⬇️  Fetching posts...');
-                const postsResult = await apiService.fetchPosts();
-                if (postsResult.success) {
-                    const postsSummary = await upsertData(
-                        Post,
-                        postsResult.data,
-                        'postId',
-                        (p) => ({ id: p.id, postId: p.id, userId: p.userId, title: p.title, body: p.body, isExternal: true })
-                    );
-                    console.log(`  ✓ Posts seeded: ${postsSummary.upserted} upserted, ${postsSummary.modified} modified`);
-                }
-            } else {
-                console.log(`  ✓ Posts already exist (${postCount} documents)`);
-            }
-
-            if (userCount === 0) {
-                console.log('  ⬇️  Fetching users...');
-                const usersResult = await apiService.fetchUsers();
-                if (usersResult.success) {
-                    const usersSummary = await upsertData(
-                        User,
-                        usersResult.data,
-                        'userId',
-                        (u) => ({
-                            id: u.id,
-                            userId: u.id,
-                            name: u.name,
-                            username: u.username,
-                            email: u.email,
-                            address: u.address || {},
-                            phone: u.phone || '',
-                            website: u.website || '',
-                            company: u.company || {},
-                            isExternal: true
-                        })
-                    );
-                    console.log(`  ✓ Users seeded: ${usersSummary.upserted} upserted, ${usersSummary.modified} modified`);
-                }
-            } else {
-                console.log(`  ✓ Users already exist (${userCount} documents)`);
-            }
-
-            if (commentCount === 0) {
-                console.log('  ⬇️  Fetching comments...');
-                const commentsResult = await apiService.fetchComments();
-                if (commentsResult.success) {
-                    const commentsSummary = await upsertData(
-                        Comment,
-                        commentsResult.data,
-                        'commentId',
-                        (c) => ({
-                            id: c.id,
-                            commentId: c.id,
-                            userId: c.userId || c.postId || 1,
-                            postId: c.postId,
-                            parentCommentId: c.parentCommentId ?? null,
-                            name: c.name,
-                            email: c.email,
-                            body: c.body
-                        })
-                    );
-                    console.log(`  ✓ Comments seeded: ${commentsSummary.upserted} upserted, ${commentsSummary.modified} modified`);
-                }
-            } else {
-                console.log(`  ✓ Comments already exist (${commentCount} documents)`);
-            }
-        } catch (seedError) {
-            console.error('⚠️  Error during data seeding:', seedError.message);
-        }
 
         // Start HTTP/WebSocket server
         server.on('error', async (error) => {
@@ -261,6 +263,14 @@ async function bootstrap() {
             console.log(`   Stats:    GET http://localhost:${PORT}/api/stats`);
             console.log(`   Search:   GET http://localhost:${PORT}/api/search?q=query`);
             console.log(`\n${'═'.repeat(60)}\n`);
+
+            if (String(process.env.SEED_ON_START || 'true').toLowerCase() !== 'false') {
+                setImmediate(() => {
+                    seedInitialDataIfNeeded().catch((error) => {
+                        console.error('⚠️  Background seed failed:', error?.message || error);
+                    });
+                });
+            }
         });
 
         // Graceful shutdown

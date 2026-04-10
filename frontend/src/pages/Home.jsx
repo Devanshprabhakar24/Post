@@ -19,7 +19,7 @@ import {
     syncPosts,
     unlikePost
 } from '../services/api';
-import { emitSearch, onLikeUpdated, onNewPost, onSearchResults } from '../services/socket';
+import { emitSearch, onCommentCreated, onLikeUpdated, onNewPost, onSearchResults } from '../services/socket';
 
 const PAGE_SIZE = 12;
 
@@ -447,10 +447,35 @@ export default function Home({
             setPosts((current) => dedupePosts([payload, ...current]));
         });
 
+        const stopCommentCreated = onCommentCreated((payload) => {
+            const postId = Number(payload?.postId);
+            if (!Number.isFinite(postId) || postId < 1) {
+                return;
+            }
+
+            setCommentCounts((current) => ({
+                ...current,
+                [postId]: Math.max(0, Number(current?.[postId] || 0) + 1)
+            }));
+
+            setPosts((current) => current.map((entry) => (
+                Number(entry?.postId) === postId
+                    ? { ...entry, commentsCount: Math.max(0, Number(entry?.commentsCount || 0) + 1) }
+                    : entry
+            )));
+
+            setSearchResults((current) => current.map((entry) => (
+                Number(entry?.postId) === postId
+                    ? { ...entry, commentsCount: Math.max(0, Number(entry?.commentsCount || 0) + 1) }
+                    : entry
+            )));
+        });
+
         return () => {
             stopResults();
             stopLikeUpdated();
             stopNewPost();
+            stopCommentCreated();
         };
     }, [currentUserId, debouncedQuery, hydrateCommentsCount, selectedHashtag, selectedUser, setSearching]);
 
@@ -600,7 +625,7 @@ export default function Home({
 
     return (
         <section className="space-y-3 pb-6">
-            <div className="flex gap-2.5 rounded-lg border-[0.5px] border-[var(--border-light)] bg-[var(--bg-card)] p-3 sm:gap-3 sm:p-4">
+            <div className="flex items-center gap-2.5 rounded-lg border-[0.5px] border-[var(--border-light)] bg-[var(--bg-card)] p-3 sm:gap-3 sm:p-4">
                 <div
                     className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white sm:h-10 sm:w-10"
                     style={{ backgroundColor: ['#5c6bc0', '#7b1fa2', '#00695c', '#ef6c00', '#d32f2f'][Number(user?.userId || 0) % 5] }}
@@ -612,7 +637,7 @@ export default function Home({
                     onClick={() => setComposerOpen(true)}
                     placeholder="What's on your mind?"
                     readOnly
-                    className="flex-1 cursor-pointer rounded-full border-none bg-[var(--bg-card-soft)] px-3 py-2 text-[12px] text-[var(--text-secondary)] placeholder:text-[var(--text-tertiary)] sm:px-4 sm:text-[13px]"
+                    className="min-w-0 flex-1 cursor-pointer rounded-full border border-[var(--border-soft)] bg-[var(--bg-card-soft)] px-3 py-2.5 text-sm font-medium not-italic text-[var(--text-primary)] placeholder:text-[var(--text-secondary)] focus:outline-none sm:px-4"
                 />
                 <div className="hidden items-center gap-2 sm:flex">
                     <button type="button" onClick={() => setComposerOpen(true)} className="flex items-center gap-1 rounded-full border border-[var(--border-soft)] px-3 py-1.5 text-[12px] text-[var(--text-secondary)] hover:bg-gray-50 dark:hover:bg-white/5">
