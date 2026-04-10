@@ -996,12 +996,14 @@ async function likePost(req, res) {
         ]);
 
         if (existsLike) {
+            const likedByRaw = await PostLike.find({ postId }).select('userId').lean();
+            const likedBy = likedByRaw.map((entry) => Number(entry.userId)).filter((entry) => Number.isFinite(entry));
             return res.status(200).json({
                 success: true,
                 data: {
                     postId,
                     totalLikes: Number(post.likes) || 0,
-                    likedBy: []
+                    likedBy
                 },
                 message: 'Post was already liked by this user'
             });
@@ -1009,6 +1011,8 @@ async function likePost(req, res) {
 
         await PostLike.create({ postId, userId: authUserId });
         await bufferLikeDelta(postId, 1);
+        const likedByRaw = await PostLike.find({ postId }).select('userId').lean();
+        const likedBy = likedByRaw.map((entry) => Number(entry.userId)).filter((entry) => Number.isFinite(entry));
 
         const totalLikes = Math.max(0, Number(post.likes) + 1);
 
@@ -1016,9 +1020,14 @@ async function likePost(req, res) {
             postId,
             postTitle: post.title || '',
             postUserId: post.userId,
+            actor: {
+                userId: authUserId,
+                name: actor?.name || '',
+                username: actor?.username || ''
+            },
             author: author || null,
             totalLikes,
-            likedBy: []
+            likedBy
         });
 
         await createNotification({
@@ -1026,7 +1035,12 @@ async function likePost(req, res) {
             senderId: authUserId,
             postId,
             type: 'like',
-            message: `${actor?.name || actor?.username || 'Someone'} liked your post`
+            message: `${actor?.name || actor?.username || 'Someone'} liked your post`,
+            actor: {
+                userId: authUserId,
+                name: actor?.name || '',
+                username: actor?.username || ''
+            }
         });
         invalidatePostCaches(postId);
 
@@ -1035,7 +1049,7 @@ async function likePost(req, res) {
             data: {
                 postId,
                 totalLikes,
-                likedBy: []
+                likedBy
             },
             message: 'Post liked successfully'
         });
@@ -1067,6 +1081,9 @@ async function unlikePost(req, res) {
             await bufferLikeDelta(postId, -1);
         }
 
+        const likedByRaw = await PostLike.find({ postId }).select('userId').lean();
+        const likedBy = likedByRaw.map((entry) => Number(entry.userId)).filter((entry) => Number.isFinite(entry));
+
         const totalLikes = Math.max(0, Number(post.likes) + (deleted.deletedCount > 0 ? -1 : 0));
 
         const author = await User.findOne({ userId: post.userId })
@@ -1079,7 +1096,7 @@ async function unlikePost(req, res) {
             postUserId: post.userId,
             author: author || null,
             totalLikes,
-            likedBy: []
+            likedBy
         });
         invalidatePostCaches(postId);
 
@@ -1088,7 +1105,7 @@ async function unlikePost(req, res) {
             data: {
                 postId,
                 totalLikes,
-                likedBy: []
+                likedBy
             },
             message: deleted.deletedCount > 0 ? 'Post unliked successfully' : 'Post was not liked by this user'
         });

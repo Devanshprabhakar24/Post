@@ -223,7 +223,12 @@ async function createPostComment(req, res) {
             senderId: authUserId,
             postId,
             type: 'comment',
-            message: `${actorName} commented on your post`
+            message: `${actorName} commented on your post`,
+            actor: {
+                userId: authUserId,
+                name: actor.name || '',
+                username: actor.username || ''
+            }
         });
 
         emitCommentCreated({
@@ -304,7 +309,12 @@ async function createReply(req, res) {
             senderId: authUserId,
             postId: parentComment.postId,
             type: 'reply',
-            message: `${actorName} replied to your comment`
+            message: `${actorName} replied to your comment`,
+            actor: {
+                userId: authUserId,
+                name: actor.name || '',
+                username: actor.username || ''
+            }
         });
 
         emitCommentCreated({

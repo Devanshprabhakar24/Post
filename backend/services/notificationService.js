@@ -19,7 +19,7 @@ function buildTargetUrl(type, senderId, postId) {
     return '/';
 }
 
-async function createNotification({ recipientId, senderId, postId = null, type, message }) {
+async function createNotification({ recipientId, senderId, postId = null, type, message, actor = null }) {
     const normalizedRecipientId = Number(recipientId);
     const normalizedSenderId = Number(senderId);
     const normalizedPostId = Number.isFinite(Number(postId)) && Number(postId) > 0 ? Number(postId) : null;
@@ -74,6 +74,7 @@ async function createNotification({ recipientId, senderId, postId = null, type, 
 
     const payload = {
         ...record,
+        actor,
         targetUrl: buildTargetUrl(normalizedType, normalizedSenderId, normalizedPostId)
     };
 

@@ -19,7 +19,7 @@ import {
     syncPosts,
     unlikePost
 } from '../services/api';
-import { emitSearch, onCommentCreated, onLikeUpdated, onNewPost, onSearchResults } from '../services/socket';
+import { emitSearch, joinPost, onCommentCreated, onLikeUpdated, onNewPost, onSearchResults } from '../services/socket';
 
 const PAGE_SIZE = 12;
 
@@ -70,16 +70,17 @@ function sanitizePost(post, currentUserId, userMap, commentsMap, isUserOnline) {
 }
 
 function applyLikeToList(list, postId, userId, shouldLike) {
+    const targetId = Number(postId);
     return list.map((item) => {
-        if (item.postId !== postId) {
+        if (Number(item.postId) !== targetId) {
             return item;
         }
 
-        const currentLikedBy = Array.isArray(item.likedBy) ? item.likedBy : [];
+        const currentLikedBy = Array.isArray(item.likedBy) ? item.likedBy.map(Number) : [];
         const normalizedUserId = Number(userId);
         const nextLikedBy = shouldLike
             ? Array.from(new Set([...currentLikedBy, normalizedUserId]))
-            : currentLikedBy.filter((entry) => Number(entry) !== normalizedUserId);
+            : currentLikedBy.filter((entry) => entry !== normalizedUserId);
 
         return {
             ...item,
@@ -91,17 +92,18 @@ function applyLikeToList(list, postId, userId, shouldLike) {
 }
 
 function applySocketLike(list, payload, currentUserId) {
+    const targetId = Number(payload?.postId);
     return list.map((item) => {
-        if (item.postId !== payload.postId) {
+        if (Number(item.postId) !== targetId) {
             return item;
         }
 
-        const likedBy = Array.isArray(payload.likedBy) ? payload.likedBy : [];
+        const likedBy = Array.isArray(payload.likedBy) ? payload.likedBy.map(Number) : [];
         return {
             ...item,
             likedBy,
             likes: Number(payload.totalLikes) || 0,
-            isLiked: likedBy.includes(currentUserId)
+            isLiked: likedBy.includes(Number(currentUserId))
         };
     });
 }
@@ -269,6 +271,11 @@ export default function Home({
             setTotalPages(response?.pagination?.pages || 1);
             setHasMore(targetPage < (response?.pagination?.pages || 1));
             await hydrateCommentsCount(nextPosts);
+            nextPosts.forEach((post) => {
+                if (post?.postId) {
+                    joinPost(post.postId);
+                }
+            });
         } catch (requestError) {
             const isCanceled =
                 requestError?.name === 'CanceledError' ||
@@ -445,6 +452,9 @@ export default function Home({
             }
 
             setPosts((current) => dedupePosts([payload, ...current]));
+            if (payload?.postId) {
+                joinPost(payload.postId);
+            }
         });
 
         const stopCommentCreated = onCommentCreated((payload) => {

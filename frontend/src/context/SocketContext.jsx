@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import toast from 'react-hot-toast';
 import { useAuth } from './AuthContext';
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '../services/api';
-import { connectSocket, disconnectSocket, identifyUser, onLikeUpdated, onNewPost, onNotification, onUserOffline, onUserOnline, socket } from '../services/socket';
+import { connectSocket, disconnectSocket, identifyUser, onNewPost, onNotification, onUserOffline, onUserOnline, socket } from '../services/socket';
 
 const SocketContext = createContext(null);
 
@@ -138,28 +138,6 @@ export function SocketProvider({ children }) {
             ].slice(0, 30));
         });
         unsubscribes.push(stopPostCreated);
-
-        const stopLikeUpdated = onLikeUpdated((payload) => {
-            if (!active) {
-                return;
-            }
-
-            const message = buildLikeNotificationMessage(payload);
-
-            setNotifications((current) => [
-                normalizeNotification({
-                    id: `${Date.now()}-like-${payload?.postId || 'post'}`,
-                    type: 'like',
-                    message,
-                    targetUrl: buildLikeNotificationTarget(payload),
-                    isRead: false,
-                    createdAt: new Date().toISOString(),
-                    payload
-                }),
-                ...current
-            ].slice(0, 30));
-        });
-        unsubscribes.push(stopLikeUpdated);
 
         const stopUserOnline = onUserOnline((payload) => {
             if (!active) {
