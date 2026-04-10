@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useAuth } from './AuthContext';
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '../services/api';
@@ -82,6 +82,7 @@ export function SocketProvider({ children }) {
     }, [user?.userId]);
 
     useEffect(() => {
+        let active = true;
         connectSocket();
 
         if (user?.userId) {
@@ -91,6 +92,10 @@ export function SocketProvider({ children }) {
         const unsubscribes = [];
 
         const stopNotification = onNotification((payload) => {
+            if (!active) {
+                return;
+            }
+
             const kind = String(payload?.type || 'system').toLowerCase();
             const targetUrl = payload?.targetUrl || buildLikeNotificationTarget(payload);
             const message = payload?.message || (kind === 'like'
@@ -116,6 +121,10 @@ export function SocketProvider({ children }) {
         unsubscribes.push(stopNotification);
 
         const stopPostCreated = onNewPost((payload) => {
+            if (!active) {
+                return;
+            }
+
             setNotifications((current) => [
                 {
                     id: `${Date.now()}-post-${payload?.postId || 'new'}`,
@@ -131,6 +140,10 @@ export function SocketProvider({ children }) {
         unsubscribes.push(stopPostCreated);
 
         const stopLikeUpdated = onLikeUpdated((payload) => {
+            if (!active) {
+                return;
+            }
+
             const message = buildLikeNotificationMessage(payload);
 
             setNotifications((current) => [
@@ -149,16 +162,25 @@ export function SocketProvider({ children }) {
         unsubscribes.push(stopLikeUpdated);
 
         const stopUserOnline = onUserOnline((payload) => {
+            if (!active) {
+                return;
+            }
+
             setOnlineUsers((current) => Array.from(new Set([...(current || []), ...(payload?.onlineUsers || []), Number(payload?.userId || 0)])).filter(Boolean));
         });
         unsubscribes.push(stopUserOnline);
 
         const stopUserOffline = onUserOffline((payload) => {
+            if (!active) {
+                return;
+            }
+
             setOnlineUsers((current) => current.filter((entry) => entry !== Number(payload?.userId)));
         });
         unsubscribes.push(stopUserOffline);
 
         return () => {
+            active = false;
             unsubscribes.forEach((unsubscribe) => {
                 if (typeof unsubscribe === 'function') {
                     unsubscribe();
@@ -168,7 +190,7 @@ export function SocketProvider({ children }) {
         };
     }, [user?.userId]);
 
-    const markAllRead = async () => {
+    const markAllRead = useCallback(async () => {
         try {
             await markAllNotificationsRead();
         } catch (_error) {
@@ -176,9 +198,9 @@ export function SocketProvider({ children }) {
         }
 
         setNotifications((current) => current.map((item) => ({ ...item, read: true })));
-    };
+    }, []);
 
-    const markNotificationAsRead = async (notificationId) => {
+    const markNotificationAsRead = useCallback(async (notificationId) => {
         try {
             await markNotificationRead(notificationId);
         } catch (_error) {
@@ -188,14 +210,14 @@ export function SocketProvider({ children }) {
         setNotifications((current) => current.map((item) => (
             item.id === String(notificationId) ? { ...item, read: true } : item
         )));
-    };
+    }, []);
 
-    const clearNotifications = () => {
+    const clearNotifications = useCallback(() => {
         setNotifications([]);
-    };
+    }, []);
 
     const unreadCount = notifications.filter((item) => !item.read).length;
-    const isUserOnline = (userId) => onlineUsers.includes(Number(userId));
+    const isUserOnline = useCallback((userId) => onlineUsers.includes(Number(userId)), [onlineUsers]);
 
     const value = useMemo(
         () => ({

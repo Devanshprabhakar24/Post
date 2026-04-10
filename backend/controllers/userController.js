@@ -38,6 +38,35 @@ function normalizeUser(user) {
     };
 }
 
+function resolveProfileImageFields(user) {
+    const directProfilePic = String(user?.profilePic || '').trim();
+    const directImageUrl = String(user?.imageUrl || '').trim();
+
+    if (directProfilePic || directImageUrl) {
+        const resolved = directProfilePic || directImageUrl;
+        return {
+            imageUrl: directImageUrl || resolved,
+            profilePic: resolved
+        };
+    }
+
+    const imageData = String(user?.profilePicData || '').trim();
+    if (!imageData) {
+        return {
+            imageUrl: '',
+            profilePic: ''
+        };
+    }
+
+    const contentType = String(user?.profilePicContentType || 'image/jpeg').trim() || 'image/jpeg';
+    const dataUrl = `data:${contentType};base64,${imageData}`;
+
+    return {
+        imageUrl: dataUrl,
+        profilePic: dataUrl
+    };
+}
+
 /**
  * Upsert users into database
  */
@@ -83,13 +112,23 @@ async function getAllUsers(req, res) {
         const users = await User.find(query)
             .sort({ _id: -1 })
             .limit(limit)
-            .select({ _id: 1, userId: 1, name: 1, username: 1, email: 1, bio: 1, imageUrl: 1, profilePic: 1, isOnline: 1, followers: 1, following: 1, isExternal: 1, createdAt: 1, profilePicData: 0, profilePicContentType: 0 })
+            .select({ _id: 1, userId: 1, name: 1, username: 1, email: 1, bio: 1, imageUrl: 1, profilePic: 1, isOnline: 1, followers: 1, following: 1, isExternal: 1, createdAt: 1, profilePicData: 1, profilePicContentType: 1 })
             .lean();
 
         const nextCursor = users.length > 0 ? String(users[users.length - 1]._id || '') : null;
         const normalizedUsers = users.map((entry) => {
-            const { _id, ...rest } = entry;
-            return rest;
+            const { _id, profilePicData, profilePicContentType, ...rest } = entry;
+            const image = resolveProfileImageFields({
+                ...rest,
+                profilePicData,
+                profilePicContentType
+            });
+
+            return {
+                ...rest,
+                imageUrl: image.imageUrl,
+                profilePic: image.profilePic
+            };
         });
 
         return res.status(200).json({
@@ -128,7 +167,7 @@ async function getUserById(req, res) {
         }
 
         const user = await User.findOne({ userId })
-            .select({ _id: 0, userId: 1, name: 1, username: 1, email: 1, bio: 1, imageUrl: 1, profilePic: 1, followers: 1, following: 1, isOnline: 1, onlineAt: 1, address: 1, phone: 1, website: 1, company: 1, profilePicData: 0, profilePicContentType: 0 })
+            .select({ _id: 0, userId: 1, name: 1, username: 1, email: 1, bio: 1, imageUrl: 1, profilePic: 1, followers: 1, following: 1, isOnline: 1, onlineAt: 1, address: 1, phone: 1, website: 1, company: 1, profilePicData: 1, profilePicContentType: 1 })
             .lean();
 
         if (!user) {
@@ -138,8 +177,10 @@ async function getUserById(req, res) {
             });
         }
 
+        const image = resolveProfileImageFields(user);
+
         const posts = await Post.find({ userId })
-            .select({ _id: 0, postId: 1, userId: 1, title: 1, body: 1, imageUrl: 1, hashtags: 1, likes: 1, createdAt: 1, updatedAt: 1, imageData: 0 })
+            .select({ _id: 0, postId: 1, userId: 1, title: 1, body: 1, imageUrl: 1, hashtags: 1, likes: 1, createdAt: 1, updatedAt: 1 })
             .sort({ createdAt: -1 })
             .lean();
 
@@ -148,6 +189,8 @@ async function getUserById(req, res) {
             likedBy: []
         }));
 
+        const { profilePicData, profilePicContentType, ...safeUser } = user;
+
         const followersCount = Array.isArray(user.followers) ? user.followers.length : 0;
         const followingCount = Array.isArray(user.following) ? user.following.length : 0;
         const isFollowing = viewerUserId ? (Array.isArray(user.followers) && user.followers.includes(viewerUserId)) : false;
@@ -155,7 +198,11 @@ async function getUserById(req, res) {
         return res.status(200).json({
             success: true,
             data: {
-                user,
+                user: {
+                    ...safeUser,
+                    imageUrl: image.imageUrl,
+                    profilePic: image.profilePic
+                },
                 posts: normalizedPosts,
                 followersCount,
                 followingCount,
@@ -197,7 +244,7 @@ async function getUserPosts(req, res) {
         }
 
         const posts = await Post.find({ userId })
-            .select({ _id: 0, postId: 1, userId: 1, title: 1, body: 1, imageUrl: 1, hashtags: 1, likes: 1, createdAt: 1, updatedAt: 1, imageData: 0 })
+            .select({ _id: 0, postId: 1, userId: 1, title: 1, body: 1, imageUrl: 1, hashtags: 1, likes: 1, createdAt: 1, updatedAt: 1 })
             .sort({ createdAt: -1 })
             .lean();
 

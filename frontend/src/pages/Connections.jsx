@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Loader from '../components/Loader';
 import { useAuth } from '../context/AuthContext';
-import { fetchUserById, fetchUsers, followUser, unfollowUser } from '../services/api';
+import { fetchUserById, fetchUsers } from '../services/api';
 
 function normalizeId(value) {
     const num = Number(value);
@@ -18,7 +18,6 @@ export default function Connections({ mode = 'followers' }) {
     const [loading, setLoading] = useState(true);
     const [profileData, setProfileData] = useState(null);
     const [users, setUsers] = useState([]);
-    const [pending, setPending] = useState(null);
 
     const authId = normalizeId(user?.userId);
     const targetUserId = normalizeId(routeUserId) || authId;
@@ -76,29 +75,6 @@ export default function Connections({ mode = 'followers' }) {
         .map((id) => usersById.get(Number(id)))
         .filter(Boolean);
 
-    const handleToggleFollow = async (targetId) => {
-        const currentUserId = normalizeId(user?.userId);
-        if (!currentUserId || currentUserId === targetId) {
-            return;
-        }
-
-        const currentlyFollowing = Array.isArray(user?.following) && user.following.includes(targetId);
-        setPending(targetId);
-        try {
-            if (currentlyFollowing) {
-                await unfollowUser(targetId);
-                toast.success('Unfollowed');
-            } else {
-                await followUser(targetId);
-                toast.success('Following');
-            }
-        } catch (error) {
-            toast.error(error.message || 'Failed to update follow status');
-        } finally {
-            setPending(null);
-        }
-    };
-
     if (loading) {
         return <Loader count={3} />;
     }
@@ -121,27 +97,12 @@ export default function Connections({ mode = 'followers' }) {
                     </div>
                 ) : (
                     connections.map((entry) => {
-                        const uid = Number(entry.userId);
-                        const isSelf = uid === normalizeId(user?.userId);
-                        const isFollowing = Array.isArray(user?.following) && user.following.includes(uid);
-
                         return (
-                            <div key={entry.userId} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] p-3">
+                            <div key={entry.userId} className="rounded-xl border border-[var(--border-light)] bg-[var(--bg-card)] p-3">
                                 <Link to={`/profile/${entry.userId}`} className="min-w-0">
                                     <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{entry.name || entry.username}</p>
                                     <p className="truncate text-xs text-[var(--text-secondary)]">@{entry.username || entry.email}</p>
                                 </Link>
-
-                                {!isSelf && (
-                                    <button
-                                        type="button"
-                                        onClick={() => handleToggleFollow(uid)}
-                                        disabled={pending === uid}
-                                        className="rounded-full border border-[var(--accent-red)] px-3 py-1 text-xs font-semibold text-[var(--accent-red)] hover:bg-red-50 dark:hover:bg-red-500/15 disabled:opacity-60"
-                                    >
-                                        {pending === uid ? '...' : isFollowing ? 'Following' : 'Follow'}
-                                    </button>
-                                )}
                             </div>
                         );
                     })

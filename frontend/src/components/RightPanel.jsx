@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { followUser, unfollowUser } from '../services/api';
 
 function getTrendingHashtags(posts) {
     const countMap = new Map();
@@ -32,8 +31,6 @@ function getTrendingHashtags(posts) {
 
 export default function RightPanel({ users = [], posts = [] }) {
     const { user } = useAuth();
-    const [pendingId, setPendingId] = useState(null);
-    const [followingState, setFollowingState] = useState({});
 
     const trendingHashtags = useMemo(() => {
         const computed = getTrendingHashtags(posts);
@@ -64,28 +61,6 @@ export default function RightPanel({ users = [], posts = [] }) {
         [user?.userId, uniqueUsers]
     );
 
-    const handleFollowToggle = async (targetUserId) => {
-        const currentlyFollowing = Boolean(followingState[targetUserId]);
-        setPendingId(targetUserId);
-
-        try {
-            if (currentlyFollowing) {
-                await unfollowUser(targetUserId);
-            } else {
-                await followUser(targetUserId);
-            }
-
-            setFollowingState((current) => ({
-                ...current,
-                [targetUserId]: !currentlyFollowing
-            }));
-        } catch (error) {
-            toast.error(error.message || 'Failed to update follow state');
-        } finally {
-            setPendingId(null);
-        }
-    };
-
     const getAvatarColor = (userId) => {
         const colors = ['#7b1fa2', '#00695c', '#d32f2f', '#5c6bc0', '#ef6c00', '#f4511e'];
         return colors[Number(userId || 0) % colors.length];
@@ -111,7 +86,6 @@ export default function RightPanel({ users = [], posts = [] }) {
                 <h3 className="mb-3 text-[12px] font-semibold text-[var(--text-primary)]">People to follow</h3>
                 <div className="space-y-3">
                     {suggestions.length > 0 ? suggestions.map((entry) => {
-                        const isFollowing = Boolean(followingState[entry.userId]);
                         const avatarColor = getAvatarColor(entry.userId);
 
                         return (
@@ -126,13 +100,6 @@ export default function RightPanel({ users = [], posts = [] }) {
                                     <p className="truncate text-[12px] font-semibold text-[var(--text-primary)]">{entry.name}</p>
                                     <p className="text-[10px] text-[var(--text-tertiary)]">@{entry.username}</p>
                                 </div>
-                                <button
-                                    onClick={() => handleFollowToggle(entry.userId)}
-                                    disabled={pendingId === entry.userId}
-                                    className="h-6 flex-shrink-0 rounded-full border-[0.5px] border-[var(--border-soft)] bg-[var(--bg-card-soft)] px-2 text-[10px] font-semibold text-[var(--text-secondary)] hover:opacity-90"
-                                >
-                                    {isFollowing ? 'Following' : 'Follow'}
-                                </button>
                             </div>
                         );
                     }) : (

@@ -7,9 +7,7 @@ import useMagnet from '../hooks/useMagnet';
 import { useAuth } from '../context/AuthContext';
 import {
     PASSWORD_RULES,
-    isEmailVerified,
     isValidEmail,
-    markEmailVerified,
     validatePassword,
     validateTestOtp
 } from '../lib/authValidation';
@@ -47,11 +45,6 @@ export default function Register() {
             return;
         }
 
-        if (isEmailVerified(form.email)) {
-            toast.error('This email can only be used once in the test flow');
-            return;
-        }
-
         if (!passwordState.valid) {
             toast.error('Password does not meet the required policy');
             return;
@@ -70,7 +63,6 @@ export default function Register() {
 
         setLoading(true);
         try {
-            markEmailVerified(form.email);
             await register(form);
             toast.success('Account created successfully');
             navigate('/', { replace: true });

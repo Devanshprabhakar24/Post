@@ -282,7 +282,9 @@ export default function App() {
     const [panelPosts, setPanelPosts] = useState([]);
     const [theme, setTheme] = useState(getStoredTheme);
     const { isAuthenticated } = useAuth();
-    const isAuthRoute = location.pathname === '/login' || location.pathname === '/register';
+    const isAuthRoute = ['/login', '/register'].some(
+        (path) => location.pathname === path || location.pathname.startsWith(`${path}/`)
+    );
 
     useEffect(() => {
         localStorage.setItem(THEME_KEY, theme);
@@ -329,7 +331,7 @@ export default function App() {
             setUsers,
             setPanelPosts
         }),
-        [query, searching, selectedUser, sortMode, users]
+        [query, searching, selectedUser, sortMode, users, setPanelPosts]
     );
 
     return (

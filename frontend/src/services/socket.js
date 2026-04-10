@@ -3,10 +3,6 @@ import { io } from 'socket.io-client';
 const FALLBACK_URL = 'http://localhost:8000';
 const isDev = import.meta.env.DEV;
 
-if (!isDev && !String(import.meta.env.VITE_WS_URL || import.meta.env.VITE_API_URL || '').trim()) {
-    throw new Error('VITE_WS_URL or VITE_API_URL is required in production');
-}
-
 function normalizeUrl(raw) {
     if (!raw) {
         return FALLBACK_URL;
@@ -31,9 +27,9 @@ const SOCKET_OPTIONS = import.meta.env.DEV
         autoConnect: false
     };
 
-let socket = io(`${SOCKET_URL}/feed`, SOCKET_OPTIONS);
-let searchSocket = io(`${SOCKET_URL}/search`, SOCKET_OPTIONS);
-let presenceSocket = io(`${SOCKET_URL}/presence`, SOCKET_OPTIONS);
+let socket = null;
+let searchSocket = null;
+let presenceSocket = null;
 
 function createFeedSocket() {
     return io(`${SOCKET_URL}/feed`, SOCKET_OPTIONS);
@@ -78,49 +74,61 @@ function connectSocket() {
 }
 
 function onSearchResults(handler) {
-    ensureSockets();
+    if (!searchSocket) {
+        return () => { };
+    }
+
     searchSocket.on('results', handler);
     return () => searchSocket.off('results', handler);
 }
 
 function emitSearch(query, debounceMs = 300) {
-    ensureSockets();
-    searchSocket.emit('search', { query, debounceMs });
+    searchSocket?.emit('search', { query, debounceMs });
 }
 
 function onLikeUpdated(handler) {
-    ensureSockets();
+    if (!socket) {
+        return () => { };
+    }
+
     socket.on('likeUpdated', handler);
     return () => socket.off('likeUpdated', handler);
 }
 
 function onNewPost(handler) {
-    ensureSockets();
+    if (!socket) {
+        return () => { };
+    }
+
     socket.on('newPost', handler);
     return () => socket.off('newPost', handler);
 }
 
 function onUserOnline(handler) {
-    ensureSockets();
+    if (!presenceSocket) {
+        return () => { };
+    }
+
     presenceSocket.on('userOnline', handler);
     return () => presenceSocket.off('userOnline', handler);
 }
 
 function onUserOffline(handler) {
-    ensureSockets();
+    if (!presenceSocket) {
+        return () => { };
+    }
+
     presenceSocket.on('userOffline', handler);
     return () => presenceSocket.off('userOffline', handler);
 }
 
 function identifyUser(userId) {
-    ensureSockets();
-    socket.emit('identify', { userId });
-    presenceSocket.emit('identify', { userId });
+    socket?.emit('identify', { userId });
+    presenceSocket?.emit('identify', { userId });
 }
 
 function joinPost(postId) {
-    ensureSockets();
-    socket.emit('joinPost', postId);
+    socket?.emit('joinPost', postId);
 }
 
 function disconnectSocket() {
@@ -144,7 +152,10 @@ function disconnectSocket() {
 }
 
 function onNotification(handler) {
-    ensureSockets();
+    if (!socket) {
+        return () => { };
+    }
+
     socket.on('notification', handler);
     return () => socket.off('notification', handler);
 }

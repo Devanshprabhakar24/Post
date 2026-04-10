@@ -1,6 +1,7 @@
 import { Bell, LogOut, Menu, Moon, Sun } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import SearchBar from './SearchBar';
+import { Avatar } from './ui/avatar';
 
 export default function Navbar({
     query,
@@ -55,7 +56,7 @@ export default function Navbar({
                         className="relative grid h-9 w-9 place-items-center rounded-full border border-[var(--border-soft)] text-[var(--text-secondary)] hover:bg-[var(--bg-card-soft)]"
                     >
                         <Bell className="h-4.5 w-4.5" />
-                        {unreadCount > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[var(--accent-red)]" />}
+                        {unreadCount > 0 && <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-[var(--accent-red)]" />}
                     </button>
 
                     <button
@@ -70,10 +71,14 @@ export default function Navbar({
                     {isAuthenticated && (
                         <Link
                             to="/profile"
-                            className="grid h-9 w-9 place-items-center rounded-full bg-[#5c6bc0] text-xs font-semibold text-white"
+                            className="block"
                             aria-label="Open profile"
                         >
-                            {(user?.name || user?.username || 'U').charAt(0).toUpperCase()}
+                            <Avatar
+                                name={user?.name || user?.username || 'User'}
+                                src={user?.profilePic || user?.imageUrl || user?.profilePicData || ''}
+                                className="h-9 w-9 border border-[var(--border-soft)]"
+                            />
                         </Link>
                     )}
 
@@ -84,6 +89,17 @@ export default function Navbar({
                         >
                             Admin
                         </Link>
+                    )}
+
+                    {isAuthenticated && (
+                        <button
+                            type="button"
+                            onClick={onLogout}
+                            aria-label="Log out"
+                            className="grid h-9 w-9 place-items-center rounded-full border border-[var(--border-soft)] text-[var(--text-secondary)] sm:hidden"
+                        >
+                            <LogOut className="h-4.5 w-4.5" />
+                        </button>
                     )}
 
                     {isAuthenticated && (

@@ -8,7 +8,7 @@ import { Avatar } from '../components/ui/avatar';
 import { useAuth } from '../context/AuthContext';
 import { useSocketContext } from '../context/SocketContext';
 import useCountUp from '../hooks/useCountUp';
-import { fetchUserById, fetchUsers, followUser, likePost, unlikePost, unfollowUser, uploadProfilePicture } from '../services/api';
+import { fetchUserById, fetchUserPosts, fetchUsers, likePost, unlikePost, uploadProfilePicture } from '../services/api';
 
 function hashGradient(seed) {
     const text = String(seed || 'profile');
@@ -31,7 +31,6 @@ export default function Profile() {
     const [profileData, setProfileData] = useState(null);
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [updatingFollow, setUpdatingFollow] = useState(false);
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [selectedPhotoFile, setSelectedPhotoFile] = useState(null);
     const [photoPreview, setPhotoPreview] = useState('');
@@ -96,9 +95,25 @@ export default function Profile() {
 
             setLoading(true);
             try {
-                const data = await fetchUserById(viewedUserId);
+                const [data, authoredPosts] = await Promise.all([
+                    fetchUserById(viewedUserId),
+                    fetchUserPosts(viewedUserId)
+                ]);
                 if (active) {
-                    setProfileData(data || null);
+                    const merged = data
+                        ? {
+                            ...data,
+                            posts: Array.isArray(authoredPosts) ? authoredPosts : (Array.isArray(data?.posts) ? data.posts : [])
+                        }
+                        : {
+                            user: user || null,
+                            posts: Array.isArray(authoredPosts) ? authoredPosts : [],
+                            followersCount: Number(user?.followersCount || user?.followers?.length || 0),
+                            followingCount: Number(user?.followingCount || user?.following?.length || 0),
+                            isFollowing: false
+                        };
+
+                    setProfileData(merged);
                     hasShownFetchError.current = false;
                 }
             } catch (error) {
@@ -139,28 +154,6 @@ export default function Profile() {
         }, {}),
         [users]
     );
-
-    const handleFollowToggle = async () => {
-        if (isOwnProfile || !profileUser?.userId) {
-            return;
-        }
-
-        setUpdatingFollow(true);
-        try {
-            const result = isFollowing ? await unfollowUser(profileUser.userId) : await followUser(profileUser.userId);
-            setProfileData((current) => current ? {
-                ...current,
-                isFollowing: Boolean(result?.isFollowing),
-                followersCount: Number(result?.followersCount ?? current.followersCount),
-                followingCount: Number(result?.followingCount ?? current.followingCount)
-            } : current);
-            toast.success(isFollowing ? 'Unfollowed' : 'Following');
-        } catch (error) {
-            toast.error(error.message || 'Failed to update follow state');
-        } finally {
-            setUpdatingFollow(false);
-        }
-    };
 
     const handleLikeToggle = async (targetPost) => {
         if (!targetPost?.postId || !user?.userId) {
@@ -297,17 +290,6 @@ export default function Profile() {
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                            {!isOwnProfile && (
-                                <button
-                                    type="button"
-                                    onClick={handleFollowToggle}
-                                    disabled={updatingFollow}
-                                    className="rounded-full border border-volt/70 bg-volt px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-ink disabled:opacity-60"
-                                >
-                                    {updatingFollow ? 'Updating...' : isFollowing ? 'Following' : 'Follow'}
-                                </button>
-                            )}
-
                             {isOwnProfile && (
                                 <>
                                     <label className="cursor-pointer rounded-full border border-mist/45 px-4 py-2 ui-font text-xs uppercase tracking-[0.14em] text-mist hover:border-volt hover:text-volt">

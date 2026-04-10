@@ -53,6 +53,11 @@ export default function Login() {
         }
 
         if (!showOtp) {
+            if (!String(form.password || '').trim()) {
+                toast.error('Password is required');
+                return;
+            }
+
             setShowOtp(true);
             toast('Enter the test OTP to continue');
             return;

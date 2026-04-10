@@ -41,7 +41,15 @@ export default function NotificationPanel({ open, onClose }) {
                             <button type="button" onClick={markAllRead} className="rounded-full border border-volt/55 px-3 py-1 ui-font text-[11px] uppercase tracking-[0.14em] text-volt hover:bg-volt hover:text-ink">
                                 <CheckCheck className="mr-1 inline h-3 w-3" /> Mark all
                             </button>
-                            <button type="button" onClick={clearNotifications} className="rounded-full border border-mist/45 px-3 py-1 ui-font text-[11px] uppercase tracking-[0.14em] text-mist hover:border-ember hover:text-ember">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (window.confirm('Clear all notifications?')) {
+                                        clearNotifications();
+                                    }
+                                }}
+                                className="rounded-full border border-mist/45 px-3 py-1 ui-font text-[11px] uppercase tracking-[0.14em] text-mist hover:border-ember hover:text-ember"
+                            >
                                 <Trash2 className="mr-1 inline h-3 w-3" /> Clear
                             </button>
                         </div>
@@ -53,49 +61,43 @@ export default function NotificationPanel({ open, onClose }) {
                                     <p className="mt-2 font-body italic text-mist">No alerts yet.</p>
                                 </div>
                             ) : (
-                                notifications.map((item) => {
-                                    const card = (
-                                        <motion.div
-                                            key={item.id}
-                                            variants={drawerItemVariants}
-                                            className={`rounded-2xl border p-3 ${item.read ? 'border-mist/28 bg-ink/35' : 'border-volt/50 bg-volt/10'}`}
-                                        >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0">
-                                                    <p className="font-body text-sm text-paper">{item.message}</p>
-                                                    <p className="mt-1 ui-font text-[10px] uppercase tracking-[0.14em] text-mist">
-                                                        {new Date(item.createdAt).toLocaleTimeString()}
-                                                    </p>
-                                                </div>
-                                                {!item.read && (
-                                                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-ember" />
-                                                )}
+                                notifications.map((item) => (
+                                    <motion.div
+                                        key={item.id}
+                                        variants={drawerItemVariants}
+                                        className={`rounded-2xl border p-3 ${item.read ? 'border-mist/28 bg-ink/35' : 'border-volt/50 bg-volt/10'}`}
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="font-body text-sm text-paper">{item.message}</p>
+                                                <p className="mt-1 ui-font text-[10px] uppercase tracking-[0.14em] text-mist">
+                                                    {new Date(item.createdAt).toLocaleTimeString()}
+                                                </p>
                                             </div>
                                             {!item.read && (
+                                                <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-ember" />
+                                            )}
+                                        </div>
+
+                                        <div className="mt-2 flex items-center justify-between gap-2">
+                                            {!item.read ? (
                                                 <button
                                                     type="button"
                                                     onClick={() => markNotificationAsRead(item.id)}
-                                                    className="mt-2 ui-font text-[10px] uppercase tracking-[0.14em] text-volt"
+                                                    className="ui-font text-[10px] uppercase tracking-[0.14em] text-volt"
                                                 >
                                                     Mark read
                                                 </button>
-                                            )}
-                                        </motion.div>
-                                    );
+                                            ) : <span />}
 
-                                    if (item.targetUrl) {
-                                        return (
-                                            <Link key={item.id} to={item.targetUrl} onClick={onClose} className="block">
-                                                {card}
-                                                <span className="mt-1 inline-flex items-center gap-1 ui-font text-[10px] uppercase tracking-[0.14em] text-mist">
+                                            {item.targetUrl && (
+                                                <Link to={item.targetUrl} onClick={onClose} className="inline-flex items-center gap-1 ui-font text-[10px] uppercase tracking-[0.14em] text-mist">
                                                     Open <ChevronRight className="h-3 w-3" />
-                                                </span>
-                                            </Link>
-                                        );
-                                    }
-
-                                    return card;
-                                })
+                                                </Link>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                ))
                             )}
                         </div>
                     </motion.aside>

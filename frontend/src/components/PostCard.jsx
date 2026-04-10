@@ -68,8 +68,7 @@ function PostCard({
     isLive = false,
     onOpenComments,
     onRepost,
-    onShare,
-    onFollowUser
+    onShare
 }) {
     const navigate = useNavigate();
     const displayName = post?.authorName || post?.author?.name || `User ${post?.userId}`;
@@ -118,17 +117,6 @@ function PostCard({
             return `${window.location.origin}${path}`;
         }
         return path;
-    };
-
-    const handleFollow = () => {
-        if (typeof onFollowUser === 'function') {
-            onFollowUser(post);
-            return;
-        }
-
-        if (post?.userId) {
-            navigate(`/profile/${post.userId}`);
-        }
     };
 
     const handleComments = () => {
@@ -236,13 +224,6 @@ function PostCard({
                         <p className="mt-1 text-[10px] text-[var(--text-tertiary)]">{timeAgo} · 🌐 Public</p>
                     </div>
                 </div>
-                <button
-                    type="button"
-                    onClick={handleFollow}
-                    className="rounded-full border-[1.5px] border-[var(--accent-red)] px-3 py-1 text-[11px] font-semibold text-[var(--accent-red)] hover:bg-red-50 dark:hover:bg-red-500/15 sm:px-4 sm:text-[12px]"
-                >
-                    + Follow
-                </button>
             </div>
 
             {/* Post Text */}

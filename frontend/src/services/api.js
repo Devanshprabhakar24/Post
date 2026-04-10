@@ -3,15 +3,18 @@ import axios from 'axios';
 const isDev = import.meta.env.DEV;
 const configuredProdApiUrl = String(import.meta.env.VITE_API_URL || '').trim();
 
-if (!isDev && !configuredProdApiUrl) {
-    throw new Error('VITE_API_URL is required in production');
+function getBaseUrl() {
+    if (!import.meta.env.DEV && !configuredProdApiUrl) {
+        throw new Error('VITE_API_URL is required in production. Set it in your .env file.');
+    }
+
+    return import.meta.env.DEV ? '' : configuredProdApiUrl;
 }
 
 const API_BASE_URL = isDev ? '' : configuredProdApiUrl;
 const AUTH_TOKEN_KEY = 'post-explorer-access-token';
 
 const api = axios.create({
-    baseURL: API_BASE_URL,
     timeout: 15000
 });
 
@@ -31,6 +34,8 @@ api.interceptors.response.use(
 );
 
 api.interceptors.request.use((config) => {
+    config.baseURL = getBaseUrl();
+
     const token = localStorage.getItem(AUTH_TOKEN_KEY);
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;

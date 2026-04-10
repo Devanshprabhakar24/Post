@@ -42,6 +42,42 @@ function parseStoredUser() {
     }
 }
 
+function buildPersistedUser(user) {
+    if (!user || typeof user !== 'object') {
+        return null;
+    }
+
+    const imageUrl = typeof user.imageUrl === 'string' && !user.imageUrl.startsWith('data:')
+        ? user.imageUrl
+        : '';
+    const profilePic = typeof user.profilePic === 'string' && !user.profilePic.startsWith('data:')
+        ? user.profilePic
+        : imageUrl;
+
+    return {
+        userId: user.userId,
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        role: deriveRole(user),
+        bio: user.bio,
+        imageUrl,
+        profilePic,
+        followersCount: Number(user.followersCount || 0),
+        followingCount: Number(user.followingCount || 0)
+    };
+}
+
+function setLocalStorageSafely(key, value) {
+    try {
+        localStorage.setItem(key, value);
+        return true;
+    } catch (_error) {
+        return false;
+    }
+}
+
 function isTokenValid(token) {
     if (!token) {
         return false;
@@ -76,16 +112,10 @@ export function AuthProvider({ children }) {
               }
             : null;
 
-        const userToStore = normalizedUser
-            ? (() => {
-                  const clone = { ...normalizedUser };
-                  delete clone.profilePicData;
-                  return clone;
-              })()
-            : null;
+        const userToStore = buildPersistedUser(normalizedUser);
 
         if (nextToken) {
-            localStorage.setItem(AUTH_TOKEN_KEY, nextToken);
+            setLocalStorageSafely(AUTH_TOKEN_KEY, nextToken);
             setToken(nextToken);
         } else {
             localStorage.removeItem(AUTH_TOKEN_KEY);
@@ -93,8 +123,12 @@ export function AuthProvider({ children }) {
         }
 
         if (userToStore) {
-            localStorage.setItem(AUTH_USER_KEY, JSON.stringify(userToStore));
-            setUser(userToStore);
+            const stored = setLocalStorageSafely(AUTH_USER_KEY, JSON.stringify(userToStore));
+            if (!stored) {
+                localStorage.removeItem(AUTH_USER_KEY);
+            }
+
+            setUser(normalizedUser);
         } else {
             localStorage.removeItem(AUTH_USER_KEY);
             setUser(null);
@@ -124,14 +158,19 @@ export function AuthProvider({ children }) {
 
         const merged = {
             ...user,
-            ...partialUser
+            ...partialUser,
+            role: deriveRole({ ...user, ...partialUser })
         };
 
-        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(merged));
-        setUser({
-            ...merged,
-            role: deriveRole(merged)
-        });
+        const userToStore = buildPersistedUser(merged);
+        if (userToStore) {
+            const stored = setLocalStorageSafely(AUTH_USER_KEY, JSON.stringify(userToStore));
+            if (!stored) {
+                localStorage.removeItem(AUTH_USER_KEY);
+            }
+        }
+
+        setUser(merged);
     }, [user]);
 
     const value = useMemo(

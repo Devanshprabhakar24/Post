@@ -1,4 +1,3 @@
-const VERIFIED_EMAILS_KEY = 'post-explorer-verified-emails';
 const TEST_OTP = '123456';
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PASSWORD_RULES = [
@@ -16,32 +15,6 @@ function normalizeEmail(email) {
 
 function isValidEmail(email) {
     return EMAIL_REGEX.test(normalizeEmail(email));
-}
-
-function getVerifiedEmails() {
-    try {
-        const raw = localStorage.getItem(VERIFIED_EMAILS_KEY);
-        const parsed = raw ? JSON.parse(raw) : [];
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (_error) {
-        return [];
-    }
-}
-
-function isEmailVerified(email) {
-    const normalized = normalizeEmail(email);
-    return getVerifiedEmails().includes(normalized);
-}
-
-function markEmailVerified(email) {
-    const normalized = normalizeEmail(email);
-    if (!normalized) {
-        return;
-    }
-
-    const emails = new Set(getVerifiedEmails());
-    emails.add(normalized);
-    localStorage.setItem(VERIFIED_EMAILS_KEY, JSON.stringify(Array.from(emails)));
 }
 
 function validateTestOtp(value) {
@@ -71,8 +44,6 @@ export {
     PASSWORD_RULES,
     normalizeEmail,
     isValidEmail,
-    isEmailVerified,
-    markEmailVerified,
     validateTestOtp,
     validatePassword
 };
