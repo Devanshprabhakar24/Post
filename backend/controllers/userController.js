@@ -112,7 +112,7 @@ async function getAllUsers(req, res) {
         const users = await User.find(query)
             .sort({ _id: -1 })
             .limit(limit)
-            .select({ _id: 1, userId: 1, name: 1, username: 1, email: 1, bio: 1, imageUrl: 1, profilePic: 1, isOnline: 1, followers: 1, following: 1, isExternal: 1, createdAt: 1, profilePicData: 1, profilePicContentType: 1 })
+            .select({ _id: 1, userId: 1, name: 1, username: 1, email: 1, bio: 1, imageUrl: 1, profilePic: 1, isOnline: 1, isExternal: 1, createdAt: 1, profilePicData: 1, profilePicContentType: 1 })
             .lean();
 
         const nextCursor = users.length > 0 ? String(users[users.length - 1]._id || '') : null;

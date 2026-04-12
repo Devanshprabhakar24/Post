@@ -20,6 +20,14 @@ const userSchema = new mongoose.Schema(
             trim: true,
             index: true
         },
+        email: {
+            type: String,
+            required: true,
+            unique: true,
+            trim: true,
+            lowercase: true,
+            index: true
+        },
         username: {
             type: String,
             required: true,
@@ -31,7 +39,8 @@ const userSchema = new mongoose.Schema(
             required: true,
             unique: true,
             trim: true,
-            lowercase: true
+            lowercase: true,
+            index: true
         },
         role: {
             type: String,
