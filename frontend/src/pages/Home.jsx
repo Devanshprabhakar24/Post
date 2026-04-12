@@ -771,51 +771,55 @@ export default function Home({
             ) : (
                 <motion.div className="space-y-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                     <AnimatePresence>
-                        {visiblePosts.map((post, index) => (
-                            <PostCard
-                                key={post.postId}
-                                index={index}
-                                post={post}
-                                query={debouncedQuery}
-                                onToggleLike={handleLikeToggle}
-                                isLiking={likingIds.has(post.postId)}
-                                onOpenPreview={handleOpenPreview}
-                                onOpenDetails={() => handleOpenDetails(post.postId)}
-                                canDelete={isAdmin || String(post.userId) === String(user?.userId)}
-                                isOwnPost={String(post.userId) === String(user?.userId)}
-                                onDelete={handleDeletePost}
-                                onOpenComments={() => handleOpenDetails(post.postId)}
-                                showFollowButton={!isOwnPost}
-                                isFollowing={followingUserIds.has(Number(post.userId))}
-                                isFollowLoading={followLoadingIds.has(Number(post.userId))}
-                                onFollowUser={handleFollowUser}
-                                onRepost={async (targetPost) => {
-                                    const url = `${window.location.origin}/posts/${targetPost.postId}`;
-                                    if (navigator?.clipboard?.writeText) {
-                                        await navigator.clipboard.writeText(url);
-                                    }
-                                    toast.success('Post link copied for repost');
-                                }}
-                                onShare={async (targetPost) => {
-                                    const url = `${window.location.origin}/posts/${targetPost.postId}`;
-                                    if (navigator?.share) {
-                                        try {
-                                            await navigator.share({ title: targetPost?.title || 'Post', text: targetPost?.body || '', url });
-                                            return;
-                                        } catch (_error) {
-                                            // Fallback to clipboard.
-                                        }
-                                    }
+                        {visiblePosts.map((post, index) => {
+                            const isOwnPost = String(post.userId) === String(user?.userId);
 
-                                    if (navigator?.clipboard?.writeText) {
-                                        await navigator.clipboard.writeText(url);
-                                    }
-                                    toast.success('Post link copied');
-                                }}
-                                onTagClick={(tag) => navigate(`/hashtags/${String(tag || '').toLowerCase()}`)}
-                                isLive={Boolean(livePulseIds[post.postId])}
-                            />
-                        ))}
+                            return (
+                                <PostCard
+                                    key={post.postId}
+                                    index={index}
+                                    post={post}
+                                    query={debouncedQuery}
+                                    onToggleLike={handleLikeToggle}
+                                    isLiking={likingIds.has(post.postId)}
+                                    onOpenPreview={handleOpenPreview}
+                                    onOpenDetails={() => handleOpenDetails(post.postId)}
+                                    canDelete={isAdmin || isOwnPost}
+                                    isOwnPost={isOwnPost}
+                                    onDelete={handleDeletePost}
+                                    onOpenComments={() => handleOpenDetails(post.postId)}
+                                    showFollowButton={!isOwnPost}
+                                    isFollowing={followingUserIds.has(Number(post.userId))}
+                                    isFollowLoading={followLoadingIds.has(Number(post.userId))}
+                                    onFollowUser={handleFollowUser}
+                                    onRepost={async (targetPost) => {
+                                        const url = `${window.location.origin}/posts/${targetPost.postId}`;
+                                        if (navigator?.clipboard?.writeText) {
+                                            await navigator.clipboard.writeText(url);
+                                        }
+                                        toast.success('Post link copied for repost');
+                                    }}
+                                    onShare={async (targetPost) => {
+                                        const url = `${window.location.origin}/posts/${targetPost.postId}`;
+                                        if (navigator?.share) {
+                                            try {
+                                                await navigator.share({ title: targetPost?.title || 'Post', text: targetPost?.body || '', url });
+                                                return;
+                                            } catch (_error) {
+                                                // Fallback to clipboard.
+                                            }
+                                        }
+
+                                        if (navigator?.clipboard?.writeText) {
+                                            await navigator.clipboard.writeText(url);
+                                        }
+                                        toast.success('Post link copied');
+                                    }}
+                                    onTagClick={(tag) => navigate(`/hashtags/${String(tag || '').toLowerCase()}`)}
+                                    isLive={Boolean(livePulseIds[post.postId])}
+                                />
+                            );
+                        })}
                     </AnimatePresence>
                 </motion.div>
             )}
